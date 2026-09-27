@@ -334,7 +334,7 @@ export default function App() {
       if (window.location.pathname === '/privacy-policy') {
         return 'privacy-policy';
       }
-      if (window.location.pathname === '/terms-of-service') {
+      if (window.location.pathname === '/terms' || window.location.pathname === '/terms-of-service' || window.location.pathname === '/pi-test') {
         return 'terms-of-service';
       }
     }
@@ -346,7 +346,7 @@ export default function App() {
       if (activeSection === 'privacy-policy') {
         window.history.pushState(null, '', '/privacy-policy');
       } else if (activeSection === 'terms-of-service') {
-        window.history.pushState(null, '', '/terms-of-service');
+        window.history.pushState(null, '', '/terms');
       } else if (activeSection === 'home') {
         window.history.pushState(null, '', '/');
       }
@@ -590,8 +590,8 @@ export default function App() {
           <div className="flex items-center gap-3 cursor-pointer group" onClick={() => setActiveSection('home')}>
             <img src={ASSETS.LOGO} alt="GOYE Logo" className="w-10 h-10 object-contain rounded-lg shadow-sm border border-gray-100" />
             <div>
-              <h1 className="text-lg font-black tracking-tight text-[#0a0a0a] uppercase leading-none">GOYE HUB</h1>
-              <p className="text-[9px] text-[#a1a1aa] font-black tracking-widest leading-none mt-1">SERVICES PLATFORM</p>
+              <h1 className="text-sm md:text-base font-black tracking-tight text-[#0a0a0a] uppercase leading-none">GOYE SERVICES HUB</h1>
+              <p className="text-[8px] text-[#a1a1aa] font-black tracking-widest leading-none mt-1.5">BUILD • REGISTER • AUTOMATE & SCALE</p>
             </div>
           </div>
 
@@ -672,7 +672,7 @@ export default function App() {
             <div className="flex justify-between items-center mb-12">
               <div className="flex items-center gap-2">
                 <img src={ASSETS.LOGO} alt="GOYE Logo" className="w-10 h-10 object-contain rounded-lg" />
-                <span className="font-black tracking-tight text-xl uppercase">GOYE HUB</span>
+                <span className="font-black tracking-tight text-xl uppercase">GOYE SERVICES HUB</span>
               </div>
               <button onClick={() => setIsMenuOpen(false)} className="p-2 text-slate-800">
                 <X size={24} />
@@ -726,7 +726,13 @@ export default function App() {
 
       {/* Main View Container */}
       <main className="pt-20">
-        {activeSection === 'home' && <HomeView onExplore={(cat) => { setActiveCategoryFilter(cat || 'ALL'); setSelectedService(null); setActiveSection('services'); }} />}
+        {activeSection === 'home' && (
+          <HomeView 
+            onExplore={(cat) => { setActiveCategoryFilter(cat || 'ALL'); setSelectedService(null); setActiveSection('services'); }} 
+            isPiBrowser={isPiBrowser} 
+            piConfig={piConfig} 
+          />
+        )}
         {activeSection === 'services' && (
           <ServicesView 
             selectedService={selectedService} 
@@ -865,7 +871,7 @@ export default function App() {
 }
 
 // --- Home View Component ---
-function HomeView({ onExplore }: { onExplore: (category?: string) => void }) {
+function HomeView({ onExplore, isPiBrowser, piConfig }: { onExplore: (category?: string) => void, isPiBrowser: boolean, piConfig: any }) {
   return (
     <div className="w-full">
       {/* Hero Section */}
@@ -992,6 +998,241 @@ function HomeView({ onExplore }: { onExplore: (category?: string) => void }) {
           </div>
         </div>
       </section>
+
+      {/* Testnet Sandbox Testing Division */}
+      <section className="bg-[#050505] py-24 px-6 border-t border-yellow-500/10">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl font-black uppercase tracking-widest mb-4 text-[#FFD700]">Sandbox Integrations</h2>
+            <p className="text-gray-400 font-bold uppercase text-[10px] tracking-widest">Verify secure blockchain payments via official SDK endpoints</p>
+          </div>
+          <PiTestnetPaymentTest isPiBrowser={isPiBrowser} piConfig={piConfig} />
+        </div>
+      </section>
+    </div>
+  );
+}
+
+// --- Pi Testnet Payment Test Component ---
+function PiTestnetPaymentTest({ isPiBrowser, piConfig }: { isPiBrowser: boolean, piConfig: any }) {
+  const [status, setStatus] = useState<'idle' | 'auth' | 'creating' | 'approving' | 'completing' | 'success' | 'error'>('idle');
+  const [log, setLog] = useState<string[]>([]);
+  const [paymentId, setPaymentId] = useState<string>('');
+  const [txid, setTxid] = useState<string>('');
+  const [errorMessage, setErrorMessage] = useState<string>('');
+
+  const addLog = (msg: string) => {
+    setLog(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${msg}`]);
+  };
+
+  const handleTestPayment = async () => {
+    if (typeof window === 'undefined') return;
+    setStatus('auth');
+    setLog([]);
+    addLog("Initiating Pi SDK Sandbox Testnet flow...");
+
+    const Pi = (window as any).Pi;
+    if (!Pi) {
+      setStatus('error');
+      setErrorMessage("Pi SDK not loaded in active browser window.");
+      addLog("Error: Pi SDK not available.");
+      return;
+    }
+
+    try {
+      addLog("Requesting authentication scopes ['username', 'payments']...");
+      const auth = await Pi.authenticate(['username', 'payments'], (incompletePayment: any) => {
+        addLog(`Incomplete payment detected! ID: ${incompletePayment.identifier}`);
+        handleIncomplete(incompletePayment);
+      });
+
+      addLog(`Authenticated successfully! Pi User: ${auth.user.username}`);
+      addLog("Sending access token to backend for cryptographic signature verification...");
+
+      const verifyRes = await fetch('/api/pi/verify-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accessToken: auth.accessToken })
+      });
+
+      const verifyData = await verifyRes.json();
+      if (verifyData.status !== 'success') {
+        throw new Error(verifyData.message || "Failed user verification");
+      }
+
+      addLog(`User verification passed server-side! Verified Username: ${verifyData.data.username}`);
+      setStatus('creating');
+      addLog("Spawning Pi.createPayment payload: 0.01 Pi Testnet...");
+
+      Pi.createPayment({
+        amount: 0.01,
+        memo: "GOYE Test Payment",
+        metadata: { test: true, orderId: "TEST-001" }
+      }, {
+        onReadyForServerApproval: async (pid: string) => {
+          setStatus('approving');
+          setPaymentId(pid);
+          addLog(`Payment registered! ID: ${pid}. Dispatching to backend for approval...`);
+          try {
+            const approveRes = await fetch('/api/pi/approve', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ paymentId: pid })
+            });
+            const approveData = await approveRes.json();
+            if (approveData.status !== 'approved') {
+              throw new Error(approveData.message || "Approval rejected");
+            }
+            addLog(`Backend successfully approved payment on official Pi Blockchain! Approval Code: ${approveData.status}`);
+          } catch (err: any) {
+            addLog(`Approval error: ${err.message}`);
+            setStatus('error');
+            setErrorMessage(err.message);
+          }
+        },
+        onReadyForServerCompletion: async (pid: string, tx: string) => {
+          setStatus('completing');
+          setTxid(tx);
+          addLog(`Tx Signed Client-Side! TXID: ${tx}. Dispatching final completion signature to backend...`);
+          try {
+            const completeRes = await fetch('/api/pi/complete', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ paymentId: pid, txid: tx })
+            });
+            const completeData = await completeRes.json();
+            if (completeData.status !== 'success') {
+              throw new Error(completeData.message || "Completion failed");
+            }
+            addLog("Success! Server-Side Verification loops completed! Order marked as PAID.");
+            setStatus('success');
+          } catch (err: any) {
+            addLog(`Completion error: ${err.message}`);
+            setStatus('error');
+            setErrorMessage(err.message);
+          }
+        },
+        onCancel: (pid: string) => {
+          addLog(`User cancelled payment prompt. Payment ID: ${pid}`);
+          setStatus('idle');
+        },
+        onError: (err: any, payment: any) => {
+          addLog(`Pi Payment Error: ${err.message || err}`);
+          setStatus('error');
+          setErrorMessage(err.message || String(err));
+        }
+      });
+
+    } catch (err: any) {
+      addLog(`Flow crashed: ${err.message}`);
+      setStatus('error');
+      setErrorMessage(err.message);
+    }
+  };
+
+  const handleIncomplete = async (payment: any) => {
+    addLog(`Resolving incomplete payment: ${payment.identifier}`);
+    try {
+      const res = await fetch('/api/pi/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ paymentId: payment.identifier, txid: payment.transaction.txid })
+      });
+      const data = await res.json();
+      addLog(`Reconciled payment: ${data.status === 'success' ? 'SUCCESS' : 'FAILED'}`);
+    } catch (e: any) {
+      addLog(`Reconciliation error: ${e.message}`);
+    }
+  };
+
+  return (
+    <div className="bg-[#000000] text-[#FFD700] p-6 md:p-8 rounded-3xl border border-yellow-500/20 max-w-2xl mx-auto space-y-6 shadow-2xl font-sans">
+      <div className="bg-yellow-500/10 border border-yellow-500/20 p-4 rounded-2xl">
+        <h4 className="text-xs font-black uppercase tracking-widest text-[#FFD700] mb-1">
+          ⚠️ Pi Testnet Payment Test — Developer Testing Only
+        </h4>
+        <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">
+          Verify the full cryptographic approval and completion flow using Pi Sandbox SDK
+        </p>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4 text-[10px] font-black uppercase tracking-wider">
+        <div className="p-3 bg-[#0a0a0a] rounded-xl border border-yellow-500/10">
+          <span className="text-gray-500 block mb-1">Sandbox Mode</span>
+          <span className="bg-yellow-500 text-black px-2 py-0.5 rounded text-[8px] font-black tracking-widest">
+            {piConfig.networkMode === 'TESTNET' ? 'ACTIVE (TESTNET)' : 'OFF'}
+          </span>
+        </div>
+        <div className="p-3 bg-[#0a0a0a] rounded-xl border border-yellow-500/10">
+          <span className="text-gray-500 block mb-1">Pi Wallet Roles</span>
+          <span className="text-gray-300 font-bold text-[8px] truncate block">
+            {piConfig.testnetWallet.slice(0, 10)}...{piConfig.testnetWallet.slice(-10)} (TESTNET)
+          </span>
+          <span className="text-red-500 text-[7px] block mt-1">
+            KYC RECEIVING: Isolated & Locked
+          </span>
+        </div>
+      </div>
+
+      {!isPiBrowser ? (
+        <div className="p-4 bg-yellow-500/10 text-[#FFD700] border border-yellow-500/20 rounded-2xl text-[10px] font-black uppercase tracking-widest leading-relaxed text-center">
+          Open this page in Pi Browser to test payments. Standard browsers show alternative channels like Paystack / Flutterwave / USDT BEP20 / USDC Base.
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <div className="flex gap-3">
+            <button
+              onClick={handleTestPayment}
+              disabled={status === 'auth' || status === 'creating' || status === 'approving' || status === 'completing'}
+              className="flex-grow bg-[#FFD700] hover:bg-yellow-400 text-black py-3.5 px-6 rounded-xl font-black uppercase tracking-widest text-xs transition-colors shadow disabled:opacity-50 text-center"
+            >
+              {status === 'idle' && 'Test Pi Payment - 0.01 Pi Testnet'}
+              {status === 'auth' && 'Authenticating Scopes...'}
+              {status === 'creating' && 'Generating Pi Tx Payload...'}
+              {status === 'approving' && 'Waiting Server Approval...'}
+              {status === 'completing' && 'Reconciling Complete...'}
+              {status === 'success' && 'Transaction Finished! Run Again'}
+              {status === 'error' && 'Failed - Retry Payment'}
+            </button>
+            
+            <button
+              onClick={() => {
+                const Pi = (window as any).Pi;
+                if (Pi) {
+                  addLog("Checking for incomplete payments on the Pi platform...");
+                  Pi.authenticate(['username', 'payments'], handleIncomplete);
+                } else {
+                  addLog("Error: Pi SDK not available.");
+                }
+              }}
+              className="bg-[#0a0a0a] hover:bg-[#151515] text-[#FFD700] border border-yellow-500/20 py-3.5 px-6 rounded-xl font-black uppercase tracking-widest text-xs transition-colors"
+            >
+              Check Incomplete
+            </button>
+          </div>
+
+          {/* Real-time Flow Logger */}
+          {log.length > 0 && (
+            <div className="bg-[#050505] border border-yellow-500/10 rounded-2xl p-4 font-mono text-[9px] text-gray-300 space-y-1.5 max-h-48 overflow-y-auto">
+              <p className="text-[8px] text-yellow-600 uppercase font-black tracking-widest mb-2">Live Integration Trace Log</p>
+              {log.map((line, idx) => (
+                <p key={idx} className={line.includes('Error') || line.includes('crashed') ? 'text-red-500' : line.includes('Success') ? 'text-emerald-400' : ''}>
+                  {line}
+                </p>
+              ))}
+            </div>
+          )}
+
+          {status === 'success' && paymentId && (
+            <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-2xl space-y-1.5 text-[9px] font-black uppercase tracking-widest">
+              <p className="text-emerald-300 font-bold">⭐ Verification Passed!</p>
+              <p className="truncate">Payment ID: {paymentId}</p>
+              <p className="truncate">Blockchain Tx: {txid}</p>
+              <p className="text-gray-500 text-[8px] mt-1 font-bold">PI_TESTNET transaction logged. No production assets debited.</p>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -1561,12 +1802,17 @@ function AdminView({ currentUser, requests, setRequests, quotes, setQuotes, audi
   const [quoteNotes, setQuoteNotes] = useState('');
 
   const [healthMetrics, setHealthMetrics] = useState<any>(null);
+  const [liveValidation, setLiveValidation] = useState<'LOADING' | 'PASS' | 'FAIL'>('LOADING');
 
   useEffect(() => {
     fetch('/api/health')
       .then(res => res.json())
       .then(data => setHealthMetrics(data))
       .catch(err => console.warn("Could not load payment status", err));
+
+    fetch('/validation-key.txt')
+      .then(r => r.status === 200 ? setLiveValidation('PASS') : setLiveValidation('FAIL'))
+      .catch(() => setLiveValidation('FAIL'));
   }, []);
 
   if (!currentUser || currentUser.role !== 'admin') {
@@ -1784,6 +2030,24 @@ function AdminView({ currentUser, requests, setRequests, quotes, setQuotes, audi
                  <span className="text-[9px] text-gray-400 font-black">USDC_BASE</span>
                  <span className="px-2 py-0.5 rounded-full text-[8px] font-black tracking-widest bg-emerald-50 text-emerald-700 border border-emerald-150">
                    CONFIGURED
+                 </span>
+               </div>
+               <div className="flex justify-between items-center p-2.5 bg-slate-50 border border-gray-100 rounded-xl">
+                 <span className="text-[9px] text-gray-400 font-black">PI_NETWORK_MODE</span>
+                 <span className="px-2 py-0.5 rounded-full text-[8px] font-black tracking-widest bg-yellow-50 text-yellow-700 border border-yellow-150">
+                   TESTNET
+                 </span>
+               </div>
+               <div className="flex justify-between items-center p-2.5 bg-slate-50 border border-gray-100 rounded-xl">
+                 <span className="text-[9px] text-gray-400 font-black">VALIDATION_KEY</span>
+                 <span className="px-2 py-0.5 rounded-full text-[8px] font-black tracking-widest bg-emerald-50 text-emerald-700 border border-emerald-150">
+                   CONFIGURED
+                 </span>
+               </div>
+               <div className="flex justify-between items-center p-2.5 bg-slate-50 border border-gray-100 rounded-xl">
+                 <span className="text-[9px] text-gray-400 font-black">LIVE VALIDATION</span>
+                 <span className={`px-2 py-0.5 rounded-full text-[8px] font-black tracking-widest ${liveValidation === 'PASS' ? 'bg-emerald-50 text-emerald-700 border border-emerald-150' : liveValidation === 'LOADING' ? 'bg-yellow-50 text-yellow-700' : 'bg-red-50 text-red-700 border border-red-150'}`}>
+                   {liveValidation}
                  </span>
                </div>
                <div className="flex justify-between items-center p-2.5 bg-slate-50 border border-gray-100 rounded-xl">

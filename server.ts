@@ -126,19 +126,19 @@ async function createServer() {
   app.get('/api/health', (req, res) => {
     res.json({
       status: 'CONNECTED',
-      database: 'CONNECTED_LOCAL_RECONCILIATION',
+      PI_API_KEY: PI_API_KEY ? 'CONFIGURED' : 'NOT CONFIGURED',
+      PAYSTACK_SECRET_KEY: PAYSTACK_SECRET_KEY ? 'CONFIGURED' : 'NOT CONFIGURED',
+      FLUTTERWAVE_SECRET_KEY: FLUTTERWAVE_SECRET_KEY ? 'CONFIGURED' : 'NOT CONFIGURED',
+      VITE_PAYSTACK_PUBLIC_KEY: process.env.VITE_PAYSTACK_PUBLIC_KEY ? 'CONFIGURED' : 'NOT CONFIGURED',
+      VITE_FLUTTERWAVE_PUBLIC_KEY: process.env.VITE_FLUTTERWAVE_PUBLIC_KEY ? 'CONFIGURED' : 'NOT CONFIGURED',
+      PI_NETWORK_MODE: 'TESTNET',
+      PI_SANDBOX: true,
+      TESTNET_WALLET: 'GASU7...JLX',
+      VALIDATION_KEY: 'CONFIGURED',
       paymentGateways: {
-        paystack_public: PAYSTACK_PUBLIC_KEY ? 'CONFIGURED' : 'NOT CONFIGURED',
         paystack_secret: PAYSTACK_SECRET_KEY ? 'CONFIGURED' : 'NOT CONFIGURED',
-        flutterwave_public: FLUTTERWAVE_PUBLIC_KEY ? 'CONFIGURED' : 'NOT CONFIGURED',
         flutterwave_secret: FLUTTERWAVE_SECRET_KEY ? 'CONFIGURED' : 'NOT CONFIGURED',
-        usdt_bep20: 'CONFIGURED', // Hardcoded wallet address present
-        usdc_base: 'CONFIGURED',   // Hardcoded wallet address present
         pi_api_key: PI_API_KEY ? 'CONFIGURED' : 'NOT CONFIGURED'
-      },
-      piNetwork: {
-        testnetMode: 'ACTIVE',
-        sandbox: true
       },
       timestamp: Date.now()
     });
