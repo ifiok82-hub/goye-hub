@@ -385,13 +385,16 @@ export default function App() {
 
   // Pi SDK Integration & detection
   useEffect(() => {
-    if (typeof window !== 'undefined' && (navigator.userAgent.toLowerCase().includes('pibrowser') || (window as any).Pi)) {
-      setIsPiBrowser(true);
-      if ((window as any).Pi) {
-        try {
-          (window as any).Pi.init({ version: "2.0", sandbox: true });
-        } catch (e) {
-          console.warn("Pi Init error: ", e);
+    if (typeof window !== 'undefined') {
+      document.body.style.setProperty('background', '#000000', 'important');
+      if (navigator.userAgent.toLowerCase().includes('pibrowser') || (window as any).Pi) {
+        setIsPiBrowser(true);
+        if ((window as any).Pi) {
+          try {
+            (window as any).Pi.init({ version: "2.0", sandbox: true });
+          } catch (e) {
+            console.warn("Pi Init error: ", e);
+          }
         }
       }
     }
