@@ -49,7 +49,7 @@ const BRAND_GOLD = "#FFD700";
 const ADMIN_PASSWORD = "GoyeBN3583773";
 
 // --- Types ---
-type Section = 'home' | 'services' | 'dashboard' | 'admin' | 'faq' | 'about' | 'contact' | 'legal' | 'privacy-policy';
+type Section = 'home' | 'services' | 'dashboard' | 'admin' | 'faq' | 'about' | 'contact' | 'legal' | 'privacy-policy' | 'terms-of-service';
 type ServiceType = 'CAC' | 'WEB' | 'AI' | 'DIG';
 
 interface Service {
@@ -334,6 +334,9 @@ export default function App() {
       if (window.location.pathname === '/privacy-policy') {
         return 'privacy-policy';
       }
+      if (window.location.pathname === '/terms-of-service') {
+        return 'terms-of-service';
+      }
     }
     return 'home';
   });
@@ -342,6 +345,8 @@ export default function App() {
     if (typeof window !== 'undefined') {
       if (activeSection === 'privacy-policy') {
         window.history.pushState(null, '', '/privacy-policy');
+      } else if (activeSection === 'terms-of-service') {
+        window.history.pushState(null, '', '/terms-of-service');
       } else if (activeSection === 'home') {
         window.history.pushState(null, '', '/');
       }
@@ -737,6 +742,7 @@ export default function App() {
         {activeSection === 'contact' && <ContactView config={config} />}
         {activeSection === 'legal' && <LegalView />}
         {activeSection === 'privacy-policy' && <PrivacyPolicyView />}
+        {activeSection === 'terms-of-service' && <TermsOfServiceView />}
       </main>
 
       {/* Checkout Modal */}
@@ -839,7 +845,7 @@ export default function App() {
             <h4 className="text-xs font-black uppercase tracking-widest text-yellow-500 mb-6">Support & Legal</h4>
             <ul className="space-y-3 text-xs text-gray-400 uppercase tracking-widest font-bold">
               <li className="hover:text-yellow-500 cursor-pointer" onClick={() => setActiveSection('faq')}>FAQ & Pricing</li>
-              <li className="hover:text-yellow-500 cursor-pointer" onClick={() => setActiveSection('legal')}>Terms of Service</li>
+              <li className="hover:text-yellow-500 cursor-pointer" onClick={() => setActiveSection('terms-of-service')}>Terms of Service</li>
               <li className="hover:text-yellow-500 cursor-pointer" onClick={() => setActiveSection('privacy-policy')}>Privacy Policy</li>
             </ul>
           </div>
@@ -2277,6 +2283,134 @@ function PrivacyPolicyView() {
             <h3 className="text-base font-black text-[#FFD700] mb-3 tracking-widest uppercase">8. YOUR RIGHTS & DATA DELETION</h3>
             <p className="text-gray-400 text-xs uppercase tracking-widest font-black leading-relaxed">
               You maintain full ownership of your data. You may request the absolute deletion of your registered records, requests, and documents at any time by contacting our support team at <a href="mailto:goyedagosmessenterprise@gmail.com" className="underline text-yellow-400">goyedagosmessenterprise@gmail.com</a>. We will process your deletion request within 48 business hours.
+            </p>
+          </div>
+        </div>
+
+        <div className="border-t border-yellow-500/20 pt-8 flex flex-col md:flex-row justify-between items-center text-[10px] text-gray-500 font-bold uppercase tracking-widest gap-4">
+          <p>© 2026 GOYE SERVICES HUB. ALL RIGHTS RESERVED.</p>
+          <p>Contact: goyedagosmessenterprise@gmail.com</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// --- Terms of Service View Component ---
+function TermsOfServiceView() {
+  return (
+    <div className="bg-[#000000] text-[#FFD700] min-h-screen py-16 px-6 font-sans border-t border-yellow-500/20">
+      <div className="max-w-4xl mx-auto space-y-12 bg-[#0a0a0a] border border-yellow-500/20 p-8 md:p-12 rounded-3xl shadow-2xl">
+        <div className="border-b border-yellow-500/20 pb-8 text-center md:text-left">
+          <span className="bg-yellow-500/10 text-[#FFD700] px-3 py-1 rounded text-[9px] font-black uppercase tracking-widest border border-yellow-500/20 mb-4 inline-block">Official Terms Document</span>
+          <h1 className="text-3xl md:text-5xl font-black uppercase tracking-tighter text-[#FFD700] mb-2">TERMS OF SERVICE</h1>
+          <p className="text-gray-400 text-xs font-bold uppercase tracking-widest">Last Updated: September 27, 2026</p>
+        </div>
+
+        <div className="space-y-8 text-xs md:text-sm font-bold uppercase tracking-wider leading-relaxed text-gray-300">
+          <div>
+            <h3 className="text-base font-black text-[#FFD700] mb-3 tracking-widest uppercase">1. CONTRACTUAL AGREEMENT</h3>
+            <p className="text-gray-400 text-xs uppercase tracking-widest font-black leading-relaxed">
+              Welcome to <span className="text-[#FFD700]">GOYE SERVICES HUB</span> ("Company", "we", "us", "our"). These Terms of Service ("Terms") govern your access to and use of our website (accessible at <a href="https://goye-hub.vercel.app" className="underline text-yellow-400">https://goye-hub.vercel.app</a>), our client accounts, and our associated service request pipelines. By accessing our platform or initiating any service order, you unconditionally accept and agree to comply with these terms in full.
+            </p>
+          </div>
+
+          <div>
+            <h3 className="text-base font-black text-[#FFD700] mb-3 tracking-widest uppercase">2. CRITICAL AGENCY & GOVERNMENT REGISTER SERVICE WORDING</h3>
+            <p className="text-gray-400 text-xs uppercase tracking-widest font-black leading-relaxed">
+              <span className="text-yellow-500 font-black">GOYE SERVICES HUB IS A PRIVATE SERVICE PROVIDER AND INDEPENDENT AGENCY.</span> We assist clients with professional administrative filings, document preparation support, and technical submissions. 
+              <br /><br />
+              We are NOT the Corporate Affairs Commission (CAC) of Nigeria, we are NOT a government agency, and we are NOT official government representatives. 
+              <br /><br />
+              <span className="text-yellow-500 font-black">NO GUARANTEE OF GOVERNMENT ACTION:</span> We do not, cannot, and will never guarantee government approval of name reservations, CAC incorporation approvals, processing speeds, or any decision made exclusively by the Corporate Affairs Commission or other regulatory bodies.
+            </p>
+          </div>
+
+          <div>
+            <h3 className="text-base font-black text-[#FFD700] mb-3 tracking-widest uppercase">3. PROFESSIONAL SERVICE SPECIFICATIONS</h3>
+            <p className="text-gray-400 text-xs uppercase tracking-widest font-black leading-relaxed mb-3">
+              Our business operations and deliverables strictly cover the following scopes:
+            </p>
+            <ul className="list-disc list-inside space-y-2 pl-4 text-xs tracking-widest text-gray-400 uppercase">
+              <li><span className="text-[#FFD700]">CAC Registration Support:</span> Independent assistance filing document reservation and submission checklists.</li>
+              <li><span className="text-[#FFD700]">Website Design & Development:</span> Authoring, testing, and deploying custom React/Vite frontends and server code.</li>
+              <li><span className="text-[#FFD700]">AI Chatbot/AI Assistant Development:</span> Provisioning and training of custom AI models and automated flow endpoints.</li>
+              <li><span className="text-[#FFD700]">Digital Business Solutions & Products:</span> Provision of downloadable guides, configuration packages, and eSIM instructions.</li>
+            </ul>
+          </div>
+
+          <div>
+            <h3 className="text-base font-black text-[#FFD700] mb-3 tracking-widest uppercase">4. DELIVERABLES VS. GOVERNMENT CERTIFICATES</h3>
+            <p className="text-gray-400 text-xs uppercase tracking-widest font-black leading-relaxed">
+              Any reference guides, custom dashboard layouts, or digital instructions generated by GOYE SERVICES HUB for client convenience are strictly digital utility guides and must NOT be described or represented as government-issued certificates. Official certificates of incorporation or approval remain strictly under the direct custody and issuance of authorized government authorities.
+            </p>
+          </div>
+
+          <div>
+            <h3 className="text-base font-black text-[#FFD700] mb-3 tracking-widest uppercase">5. PAYMENTS & VERIFICATION LOOPS</h3>
+            <p className="text-gray-400 text-xs uppercase tracking-widest font-black leading-relaxed mb-4">
+              We process payments via secure, authorized payment gateways including Paystack, Flutterwave, USDT (BEP20), USDC (Base Network), and the Pi Network.
+            </p>
+            <ul className="list-disc list-inside space-y-2 pl-4 text-xs tracking-widest text-gray-400 uppercase">
+              <li><span className="text-[#FFD700]">Approval Distinction:</span> Submitting a service payment does NOT imply that a government authority has approved or finalized your regulatory application.</li>
+              <li><span className="text-[#FFD700]">Manual Blockchain Deposits:</span> For USDT (BEP20) and USDC (Base), payments are flagged as <span className="text-yellow-500 font-bold">PENDING VERIFICATION</span> in your customer dashboard until verified manually by our administrative team using on-chain transaction hashes.</li>
+            </ul>
+          </div>
+
+          <div>
+            <h3 className="text-base font-black text-[#FFD700] mb-3 tracking-widest uppercase">6. PI NETWORK COMPLIANCE & TESTNET DISCLAIMER</h3>
+            <p className="text-gray-400 text-xs uppercase tracking-widest font-black leading-relaxed">
+              Our integration with the Pi Network SDK operates strictly under sandbox requirements.
+              <br /><br />
+              <span className="text-yellow-500 font-black">NO PI CORE TEAM APPROVAL CLAIM:</span> GOYE SERVICES HUB makes no claims of direct Pi Mainnet approval, direct Pi Core Team endorsement, or official global merchant authorization unless explicitly provided and verified by the Pi Network.
+              <br /><br />
+              <span className="text-yellow-500 font-black">TESTNET LIMITATIONS:</span> Pi Testnet payments are strictly for developer testing, integration audits, and sandbox runs. Testnet Pi has zero monetary value and must never be represented or exchanged as real-world money for production services.
+            </p>
+          </div>
+
+          <div>
+            <h3 className="text-base font-black text-[#FFD700] mb-3 tracking-widest uppercase">7. CUSTOMER RESPONSIBILITIES & ACCURACY</h3>
+            <p className="text-gray-400 text-xs uppercase tracking-widest font-black leading-relaxed">
+              Clients must provide accurate, complete, and authentic information for all registration filings, proposed names, and support details. GOYE SERVICES HUB assumes zero liability for regulatory rejections, delays, or penalties stemming from inaccurate inputs, misrepresentations, or fraudulent data supplied by the user.
+            </p>
+          </div>
+
+          <div>
+            <h3 className="text-base font-black text-[#FFD700] mb-3 tracking-widest uppercase">8. REFUNDS & CANCELLATIONS</h3>
+            <p className="text-gray-400 text-xs uppercase tracking-widest font-black leading-relaxed">
+              Due to the immediate mobilization of technical and administrative resources, service fees are non-refundable once CAC submission queues, digital product downloads, or customized software environments have been initiated.
+            </p>
+          </div>
+
+          <div>
+            <h3 className="text-base font-black text-[#FFD700] mb-3 tracking-widest uppercase">9. INTELLECTUAL PROPERTY</h3>
+            <p className="text-gray-400 text-xs uppercase tracking-widest font-black leading-relaxed">
+              All branding assets, core source codes, graphic layouts, and documentation templates presented on the GOYE SERVICES HUB remain the exclusive intellectual property of the Company and are protected by applicable intellectual property statutes.
+            </p>
+          </div>
+
+          <div>
+            <h3 className="text-base font-black text-[#FFD700] mb-3 tracking-widest uppercase">10. GOVERNING LAW</h3>
+            <p className="text-gray-400 text-xs uppercase tracking-widest font-black leading-relaxed">
+              These Terms of Service are governed by, construed, and enforced strictly in accordance with the laws of the Federal Republic of Nigeria, without giving effect to any principles of conflicts of law. Any legal claims must be submitted to competent courts within our local jurisdiction.
+            </p>
+          </div>
+
+          <div>
+            <h3 className="text-base font-black text-[#FFD700] mb-3 tracking-widest uppercase">11. TERMINATION OF ACCESS</h3>
+            <p className="text-gray-400 text-xs uppercase tracking-widest font-black leading-relaxed">
+              We reserve the right to temporarily suspend or permanently terminate your customer profile or dashboard access if you violate any provision of these Terms, participate in unauthorized access attempts, or submit fraudulent transaction hashes.
+            </p>
+          </div>
+
+          <div>
+            <h3 className="text-base font-black text-[#FFD700] mb-3 tracking-widest uppercase">12. CONTACT INFORMATION</h3>
+            <p className="text-gray-400 text-xs uppercase tracking-widest font-black leading-relaxed">
+              For any questions, operational support, or legal clarifications, contact our support division at:
+              <br /><br />
+              <span className="text-[#FFD700]">Official Email:</span> <a href="mailto:goyedagosmessenterprise@gmail.com" className="underline text-yellow-400">goyedagosmessenterprise@gmail.com</a>
+              <br />
+              <span className="text-[#FFD700]">Primary Domain:</span> <a href="https://goye-hub.vercel.app" className="underline text-yellow-400">https://goye-hub.vercel.app</a>
             </p>
           </div>
         </div>
