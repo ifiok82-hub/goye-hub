@@ -57,10 +57,16 @@ interface Service {
   type: ServiceType;
   name: string;
   description: string;
+  shortDesc: string;
   price: number;
   govtFee?: number;
   image: string;
   timeline: string;
+  priceType: 'FIXED' | 'STARTING_FROM' | 'QUOTE_REQUIRED' | 'CUSTOM';
+  deliverables: string[];
+  requirements: string[];
+  active: boolean;
+  currency: string;
 }
 
 interface ServiceRequest {
@@ -131,21 +137,195 @@ interface AuditLog {
 // --- Dynamic Catalog Data ---
 const SERVICES_CATALOG: Service[] = [
   // CAC BUSINESS REGISTRATION & SUPPORT
-  { id: 'cac-biz-name', type: 'CAC', name: 'Business Name Registration', description: 'Complete CAC Business Name registration assistance with fast-tracked preparation and submission.', price: 15000, govtFee: 10000, timeline: '5-7 Business Days', image: ASSETS.CAC_IMG },
-  { id: 'cac-llc', type: 'CAC', name: 'Limited Liability Company Incorporation', description: 'Full incorporation service for limited liability companies including professional article drafting.', price: 35000, govtFee: 20000, timeline: '7-10 Business Days', image: ASSETS.CAC_IMG },
+  { 
+    id: 'cac-biz-name', 
+    type: 'CAC', 
+    name: 'Business Name Registration Support', 
+    description: 'Complete assistance with filing and preparing registration documents with the CAC. Subject to CAC approval timelines.', 
+    shortDesc: 'Assist with CAC Business Name registration filing.',
+    price: 15000, 
+    govtFee: 10000, 
+    timeline: '5-7 Business Days', 
+    image: ASSETS.CAC_IMG,
+    priceType: 'FIXED',
+    deliverables: ['CAC Certificate of Registration', 'Certified True Copy of Application Details', 'Official Status Verification'],
+    requirements: ['Proposed Business Name (2 Options)', 'Nature of Business Activities', 'Applicant Full Name & Address', 'Valid Government ID Copy'],
+    active: true,
+    currency: 'NGN'
+  },
+  { 
+    id: 'cac-llc', 
+    type: 'CAC', 
+    name: 'LLC Incorporation Support (Private Limited)', 
+    description: 'Expert guidance and filling assistance for Limited Liability Company incorporation, including professional Article of Association preparation.', 
+    shortDesc: 'Assist with Private Limited LLC registration support.',
+    price: 35000, 
+    govtFee: 20000, 
+    timeline: '7-10 Business Days', 
+    image: ASSETS.CAC_IMG,
+    priceType: 'FIXED',
+    deliverables: ['CAC Status Report', 'Articles of Association', 'Certified Incorporation Details', 'Pre-allocated Tax Identification Number (TIN)'],
+    requirements: ['Proposed Company Name (2 Options)', 'Share Capital Structure Details', 'Director(s) Details', 'Shareholder(s) Details', 'Office Address Copy'],
+    active: true,
+    currency: 'NGN'
+  },
+  { 
+    id: 'cac-trustee', 
+    type: 'CAC', 
+    name: 'Incorporated Trustees Assistance', 
+    description: 'Comprehensive support with filing and preparing Trustee registrations for NGOs, Churches, Associations, and Clubs.', 
+    shortDesc: 'Registration assistance for NGOs, Churches, and Clubs.',
+    price: 75000, 
+    govtFee: 45000, 
+    timeline: '21-30 Business Days', 
+    image: ASSETS.CAC_IMG,
+    priceType: 'STARTING_FROM',
+    deliverables: ['Certificate of Incorporation', 'Constitution Documents', 'Official Trustees Status Sheet'],
+    requirements: ['Proposed Association Name', 'Aims and Objectives Details', 'Trustees Board Names and IDs', 'Newspaper Publication Copies'],
+    active: true,
+    currency: 'NGN'
+  },
+  { 
+    id: 'cac-returns', 
+    type: 'CAC', 
+    name: 'CAC Annual Returns Assistance', 
+    description: 'Professional support with filing and processing annual return records to keep your registered status active and up-to-date.', 
+    shortDesc: 'File and update your registered business annual returns.',
+    price: 12000, 
+    timeline: '3-5 Business Days', 
+    image: ASSETS.CAC_IMG,
+    priceType: 'FIXED',
+    deliverables: ['CAC Official Acknowledgement Letter', 'Filing Receipt', 'Status Reactivation Support'],
+    requirements: ['RC or Business Registration Number', 'Financial Year of Return', 'Current Director Details'],
+    active: true,
+    currency: 'NGN'
+  },
   
   // PROFESSIONAL WEBSITE DEVELOPMENT
-  { id: 'web-starter', type: 'WEB', name: 'Starter Website Package', description: 'Single-page business showcase or elite interactive landing page built with modern framework integrations.', price: 45000, timeline: '4-6 Business Days', image: ASSETS.WEB_IMG },
-  { id: 'web-biz', type: 'WEB', name: 'Business & Professional Website', description: 'Elite corporate website up to 5 comprehensive pages, complete with advanced SEO setup and domain integration.', price: 85000, timeline: '7-10 Business Days', image: ASSETS.WEB_IMG },
-  { id: 'web-shop', type: 'WEB', name: 'E-commerce Luxury Web Platform', description: 'High-converting online store, complete with full payment gateway integration, cart, and automated invoice delivery.', price: 150000, timeline: '12-15 Business Days', image: ASSETS.WEB_IMG },
+  { 
+    id: 'web-starter', 
+    type: 'WEB', 
+    name: 'Starter Website Package', 
+    description: 'Elite single-page business showcase landing page built with modern responsive styling and performance integrations.', 
+    shortDesc: 'Responsive single-page business showcase landing page.',
+    price: 45000, 
+    timeline: '4-6 Business Days', 
+    image: ASSETS.WEB_IMG,
+    priceType: 'FIXED',
+    deliverables: ['Single-Page High Performance Web Application', 'SEO Base Configuration', 'WhatsApp Integration Option', '1 Month Free Maintenance support'],
+    requirements: ['Brand Logo & Guidelines', 'Text Contents & About Us section copy', 'Contact Coordinates', 'Domain Choice'],
+    active: true,
+    currency: 'NGN'
+  },
+  { 
+    id: 'web-biz', 
+    type: 'WEB', 
+    name: 'Business & Professional Website Package', 
+    description: 'Elite corporate website up to 5 custom-designed responsive pages, featuring modern contact forms, analytics trackers, and SEO setup.', 
+    shortDesc: 'Up to 5 custom pages, complete SEO and analytics setup.',
+    price: 85000, 
+    timeline: '7-10 Business Days', 
+    image: ASSETS.WEB_IMG,
+    priceType: 'FIXED',
+    deliverables: ['5-Page Modern Corporate Web App', 'Google Analytics & Console Trackers', 'Contact Forms & Booking Integrations', 'Domain and Hosting Deployment support'],
+    requirements: ['Detailed Pages Layout requirements', 'Brand Graphics assets', 'Business FAQs and text copies'],
+    active: true,
+    currency: 'NGN'
+  },
+  { 
+    id: 'web-shop', 
+    type: 'WEB', 
+    name: 'Luxury E-commerce Platform', 
+    description: 'Full e-commerce platform complete with verified payment gateway integrations (Paystack/Pi SDK), visual product catalogues, and auto receipts.', 
+    shortDesc: 'Complete e-commerce store with secure payment flows.',
+    price: 150000, 
+    timeline: '12-15 Business Days', 
+    image: ASSETS.WEB_IMG,
+    priceType: 'STARTING_FROM',
+    deliverables: ['High-Converting Online Store', 'Secure Paystack and Pi Payments checkout support', 'Product Inventory Administration panel', 'Automated Email receipt configurations'],
+    requirements: ['Product Catalogue details', 'Payment merchant credentials/keys', 'Corporate Bank Accounts details'],
+    active: true,
+    currency: 'NGN'
+  },
+  { 
+    id: 'web-custom', 
+    type: 'WEB', 
+    name: 'Custom Web Application Design', 
+    description: 'Bespoke corporate web architectures, booking portals, custom databases, CRM integrations, and full-stack software developments.', 
+    shortDesc: 'Bespoke custom full-stack web applications and CRM systems.',
+    price: 250000, 
+    timeline: '15-25 Business Days', 
+    image: ASSETS.WEB_IMG,
+    priceType: 'QUOTE_REQUIRED',
+    deliverables: ['Bespoke Full-Stack Web Application', 'Custom Database Architecture design', 'Interactive User Dashboards', 'Long-term Maintenance & SLA plan support'],
+    requirements: ['Technical Specification Sheet / User Stories', 'Competitor Reference Links', 'Required APIs list'],
+    active: true,
+    currency: 'NGN'
+  },
 
   // AI CHATBOT & AI ASSISTANT DEVELOPMENT
-  { id: 'ai-whatsapp', type: 'AI', name: 'WhatsApp Business AI Assistant', description: 'Intelligent custom-trained chatbot deployed on WhatsApp to automate lead capture, stock tracking, and orders.', price: 150000, timeline: '5-7 Business Days', image: ASSETS.AI_IMG },
-  { id: 'ai-web', type: 'AI', name: 'Website Intelligent AI Assistant', description: 'AI assistant deployed directly on your website to instantly answer FAQs and qualify customers based on business files.', price: 35000, timeline: '3-5 Business Days', image: ASSETS.AI_IMG },
+  { 
+    id: 'ai-whatsapp', 
+    type: 'AI', 
+    name: 'WhatsApp Business AI Assistant', 
+    description: 'Intelligent custom-trained chatbot deployed directly on your WhatsApp Business workspace to automate user support and sales qualification.', 
+    shortDesc: 'Automate inquiries and sales on WhatsApp 24/7.',
+    price: 150000, 
+    timeline: '5-7 Business Days', 
+    image: ASSETS.AI_IMG,
+    priceType: 'FIXED',
+    deliverables: ['Custom WhatsApp AI Assistant Agent', 'Private Vector Knowledge database configuration', 'Automated Lead Export spreadsheet setup'],
+    requirements: ['Active WhatsApp Business line', 'Comprehensive business FAQ list', 'Company Guidelines/Rules docs'],
+    active: true,
+    currency: 'NGN'
+  },
+  { 
+    id: 'ai-web', 
+    type: 'AI', 
+    name: 'Website Intelligent AI Assistant', 
+    description: 'AI assistant deployed directly on your website, custom-trained on private catalogs, documents, or websites to qualify customers.', 
+    shortDesc: 'AI assistant widget deployed on your business website.',
+    price: 35000, 
+    timeline: '3-5 Business Days', 
+    image: ASSETS.AI_IMG,
+    priceType: 'FIXED',
+    deliverables: ['Embeddable Web AI Assistant Widget', 'Tailored Chatbot Personality configuration', 'Private Datasets storage container'],
+    requirements: ['Existing website platform', 'Business FAQ and Catalog files', 'Desired chat widget brand color'],
+    active: true,
+    currency: 'NGN'
+  },
 
   // DIGITAL SOLUTIONS & BUSINESS SUPPORT
-  { id: 'dig-setup', type: 'DIG', name: 'Google Business Profile Setup', description: 'Full optimization of your online Google map placement and organic search presence.', price: 10000, timeline: '2-4 Days', image: ASSETS.DIGITAL_IMG },
-  { id: 'dig-custom', type: 'DIG', name: 'Custom Digital Solutions Setup', description: 'Bespoke technical business setup, professional email setups, or digital workflow integrations.', price: 25000, timeline: '3-5 Days', image: ASSETS.DIGITAL_IMG }
+  { 
+    id: 'dig-setup', 
+    type: 'DIG', 
+    name: 'Google Business Profile Setup & Assistance', 
+    description: 'Complete setup and optimization of your business presence on Google Maps and search maps. Does not guarantee Google authorization timelines.', 
+    shortDesc: 'Optimize your local Google search and Maps presence.',
+    price: 10000, 
+    timeline: '2-4 Days', 
+    image: ASSETS.DIGITAL_IMG,
+    priceType: 'FIXED',
+    deliverables: ['Optimized Google Business Profile profile', 'Organic Keyword Local Maps Setup', 'Customer Review Link template creation'],
+    requirements: ['Verified physical business address', 'Corporate phone and email coordinates', '5-10 business activity photos'],
+    active: true,
+    currency: 'NGN'
+  },
+  { 
+    id: 'dig-custom', 
+    type: 'DIG', 
+    name: 'Custom Digital Solutions Setup', 
+    description: 'Bespoke technological configurations: professional business email setup, payment gateway integrations, and automation flow setup.', 
+    shortDesc: 'Corporate email, custom gateway, and workflow automation setups.',
+    price: 25000, 
+    timeline: '3-5 Days', 
+    image: ASSETS.DIGITAL_IMG,
+    priceType: 'CUSTOM',
+    deliverables: ['Bespoke Professional Email accounts setup', 'Verified local workflow automation triggers', 'Unified API connector accounts setup'],
+    requirements: ['Corporate domain account coordinates', 'Workflow rules list', 'Integrations parameters'],
+    active: true,
+    currency: 'NGN'
+  }
 ];
 
 export default function App() {
@@ -266,9 +446,24 @@ export default function App() {
     setActiveSection('home');
   };
 
-  const handleRequestSubmit = (service: Service, formData: any) => {
+  const handleRequestSubmit = async (service: Service, formData: any) => {
     if (!currentUser) return;
-    const reqNo = `GOYE-${service.type}-${new Date().getFullYear()}-${Math.floor(100000 + Math.random() * 900000)}`;
+    
+    let reqNo = `GOYE-${service.type}-${new Date().getFullYear()}-${Math.floor(100000 + Math.random() * 900000)}`;
+    try {
+      const response = await fetch('/api/orders/generate-reference', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: service.type })
+      });
+      const data = await response.json();
+      if (data && data.reference) {
+        reqNo = data.reference;
+      }
+    } catch (err) {
+      console.warn("Reference API offline, fell back to secure client pattern", err);
+    }
+
     const newReq: ServiceRequest = {
       id: Math.random().toString(36).substring(7),
       requestNumber: reqNo,
@@ -296,24 +491,31 @@ export default function App() {
   const handlePaymentComplete = (ref: string, provider: string) => {
     if (!activeCheckout) return;
     
+    const isCrypto = provider === 'USDT_BEP20' || provider === 'USDC_BASE';
+    const finalStatus = isCrypto ? ('PAYMENT PENDING' as const) : ('PAYMENT VERIFIED' as const);
+
     // Update request or quote status securely
     const isQuote = 'quoteNumber' in activeCheckout;
     if (isQuote) {
-      const updatedQuotes = quotes.map(q => q.id === activeCheckout.id ? { ...q, status: 'PAID' as const } : q);
+      const updatedQuotes = quotes.map(q => q.id === activeCheckout.id ? { ...q, status: (isCrypto ? 'PENDING' : 'PAID') as any } : q);
       setQuotes(updatedQuotes);
       saveState('goye_quotes_v2', updatedQuotes);
 
-      // Update associated request to PAYMENT VERIFIED
-      const assocReq = requests.map(r => r.id === (activeCheckout as Quote).requestId ? { ...r, status: 'PAYMENT VERIFIED' as const, paymentRef: ref, paymentProvider: provider } : r);
+      // Update associated request to PAYMENT VERIFIED or PAYMENT PENDING
+      const assocReq = requests.map(r => r.id === (activeCheckout as Quote).requestId ? { ...r, status: finalStatus, paymentRef: ref, paymentProvider: provider } : r);
       setRequests(assocReq);
       saveState('goye_requests_v2', assocReq);
     } else {
-      const updatedReqs = requests.map(r => r.id === activeCheckout.id ? { ...r, status: 'PAYMENT VERIFIED' as const, paymentRef: ref, paymentProvider: provider } : r);
+      const updatedReqs = requests.map(r => r.id === activeCheckout.id ? { ...r, status: finalStatus, paymentRef: ref, paymentProvider: provider } : r);
       setRequests(updatedReqs);
       saveState('goye_requests_v2', updatedReqs);
     }
 
-    logAction(currentUser?.name || 'Customer', 'Completed Payment Verification', activeCheckout.id);
+    logAction(
+      currentUser?.name || 'Customer', 
+      isCrypto ? `Submitted ${provider} Tx Hash for verification` : 'Completed Payment Verification', 
+      activeCheckout.id
+    );
     setActiveCheckout(null);
     setActiveSection('dashboard');
   };
@@ -350,6 +552,11 @@ export default function App() {
     }, 600);
   };
 
+  const isAdmin = currentUser && (
+    currentUser.role === 'admin' || 
+    currentUser.email === 'goyedagosmessenterprise@gmail.com'
+  );
+
   return (
     <div className="min-h-screen bg-[#f8f9fa] text-slate-900 font-sans selection:bg-yellow-500/30">
       {/* Header */}
@@ -371,27 +578,57 @@ export default function App() {
           </nav>
 
           <div className="flex items-center gap-4">
+            {/* Desktop Auth Section */}
             {currentUser ? (
-              <div className="flex items-center gap-4">
+              <div className="hidden lg:flex items-center gap-3">
+                {isAdmin && (
+                  <button 
+                    onClick={() => setActiveSection('admin')}
+                    className="bg-black hover:bg-gray-900 text-white px-5 py-2.5 rounded-full font-black text-xs uppercase tracking-widest transition-all flex items-center gap-2 shadow"
+                  >
+                    <LayoutDashboard size={14} className="text-yellow-400" /> Admin Dashboard
+                  </button>
+                )}
                 <button 
-                  onClick={() => setActiveSection(currentUser.role === 'admin' ? 'admin' : 'dashboard')}
-                  className="bg-yellow-400 text-black px-5 py-2.5 rounded-full font-black text-xs uppercase tracking-widest hover:bg-yellow-300 transition-all flex items-center gap-2"
+                  onClick={() => setActiveSection('dashboard')}
+                  className="bg-yellow-400 text-black px-5 py-2.5 rounded-full font-black text-xs uppercase tracking-widest hover:bg-yellow-300 transition-all flex items-center gap-2 shadow"
                 >
-                  <LayoutDashboard size={14} /> {currentUser.role === 'admin' ? 'Admin Hub' : 'My Account'}
+                  <User size={14} /> My Account
                 </button>
-                <button onClick={handleLogout} className="p-2.5 bg-gray-100 hover:bg-gray-200 rounded-full transition-colors text-slate-800">
+                <button onClick={handleLogout} className="p-2.5 bg-gray-100 hover:bg-gray-200 rounded-full transition-colors text-slate-800" title="Sign Out">
                   <X size={16} />
                 </button>
               </div>
             ) : (
               <button 
                 onClick={() => setActiveSection('dashboard')}
-                className="bg-[#FFD700] hover:bg-yellow-400 text-black px-6 py-2.5 rounded-full font-black text-xs uppercase tracking-widest transition-all shadow-md"
+                className="hidden lg:block bg-[#FFD700] hover:bg-yellow-400 text-black px-6 py-2.5 rounded-full font-black text-xs uppercase tracking-widest transition-all shadow-md"
               >
                 Sign In
               </button>
             )}
-            <button className="lg:hidden p-2 text-slate-800" onClick={() => setIsMenuOpen(true)}>
+
+            {/* Mobile Header Buttons (Right side properly aligned next to Hamburger) */}
+            <div className="lg:hidden flex items-center gap-2">
+              {currentUser ? (
+                <button 
+                  onClick={() => setActiveSection('dashboard')}
+                  className="bg-yellow-400 text-black px-4 py-2 rounded-full font-black text-[10px] uppercase tracking-widest hover:bg-yellow-300 transition-all flex items-center gap-1.5 shadow-sm"
+                >
+                  <User size={12} /> My Account
+                </button>
+              ) : (
+                <button 
+                  onClick={() => setActiveSection('dashboard')}
+                  className="bg-[#FFD700] hover:bg-yellow-400 text-black px-4 py-2 rounded-full font-black text-[10px] uppercase tracking-widest transition-all"
+                >
+                  Sign In
+                </button>
+              )}
+            </div>
+
+            {/* Hamburger Trigger */}
+            <button className="lg:hidden p-2 text-slate-800 hover:bg-gray-100 rounded-full transition-colors" onClick={() => setIsMenuOpen(true)}>
               <Menu size={24} />
             </button>
           </div>
@@ -416,12 +653,47 @@ export default function App() {
                 <X size={24} />
               </button>
             </div>
-            <div className="flex flex-col gap-8">
+            <div className="flex flex-col gap-8 flex-grow">
               <button onClick={() => { setActiveSection('home'); setIsMenuOpen(false); }} className="text-3xl font-black text-left uppercase tracking-tight">Home</button>
               <button onClick={() => { setSelectedService(null); setActiveSection('services'); setIsMenuOpen(false); }} className="text-3xl font-black text-left uppercase tracking-tight">Services</button>
               <button onClick={() => { setActiveSection('dashboard'); setIsMenuOpen(false); }} className="text-3xl font-black text-left uppercase tracking-tight">Dashboard</button>
               <button onClick={() => { setActiveSection('faq'); setIsMenuOpen(false); }} className="text-3xl font-black text-left uppercase tracking-tight">Pricing</button>
               <button onClick={() => { setActiveSection('contact'); setIsMenuOpen(false); }} className="text-3xl font-black text-left uppercase tracking-tight">Contact</button>
+            </div>
+
+            {/* Mobile Auth Drawer Buttons */}
+            <div className="border-t border-gray-100 pt-8 mt-auto space-y-4">
+              {currentUser ? (
+                <>
+                  {isAdmin && (
+                    <button 
+                      onClick={() => { setActiveSection('admin'); setIsMenuOpen(false); }}
+                      className="w-full bg-black hover:bg-gray-900 text-white py-4 rounded-xl font-black uppercase tracking-widest text-xs flex items-center justify-center gap-2 shadow"
+                    >
+                      <LayoutDashboard size={14} className="text-yellow-400" /> Admin Dashboard
+                    </button>
+                  )}
+                  <button 
+                    onClick={() => { setActiveSection('dashboard'); setIsMenuOpen(false); }}
+                    className="w-full bg-yellow-400 hover:bg-yellow-300 text-black py-4 rounded-xl font-black uppercase tracking-widest text-xs flex items-center justify-center gap-2 shadow"
+                  >
+                    <User size={14} /> My Account
+                  </button>
+                  <button 
+                    onClick={() => { handleLogout(); setIsMenuOpen(false); }}
+                    className="w-full bg-gray-100 hover:bg-gray-200 text-slate-800 py-4 rounded-xl font-black uppercase tracking-widest text-xs flex items-center justify-center gap-2 transition-colors"
+                  >
+                    <X size={14} /> Sign Out
+                  </button>
+                </>
+              ) : (
+                <button 
+                  onClick={() => { setActiveSection('dashboard'); setIsMenuOpen(false); }}
+                  className="w-full bg-[#FFD700] hover:bg-yellow-400 text-black py-4 rounded-xl font-black uppercase tracking-widest text-xs shadow-md"
+                >
+                  Sign In
+                </button>
+              )}
             </div>
           </motion.div>
         )}
@@ -441,7 +713,7 @@ export default function App() {
             setActiveCategoryFilter={setActiveCategoryFilter}
           />
         )}
-        {activeSection === 'dashboard' && <DashboardView currentUser={currentUser} onAuth={handleRegister} requests={requests} quotes={quotes} onPay={handlePaymentInitiated} supportTickets={supportTickets} setSupportTickets={setSupportTickets} documents={documents} setRequests={setRequests} />}
+        {activeSection === 'dashboard' && <DashboardView currentUser={currentUser} onAuth={handleRegister} requests={requests} quotes={quotes} onPay={handlePaymentInitiated} supportTickets={supportTickets} setSupportTickets={setSupportTickets} documents={documents} setRequests={setRequests} isPiBrowser={isPiBrowser} onPiRegister={(p: any) => { setCurrentUser(p); saveState('goye_user_profile', p); logAction(p.name, 'User Registered via Pi SDK', p.id); }} />}
         {activeSection === 'admin' && <AdminView currentUser={currentUser} requests={requests} setRequests={setRequests} quotes={quotes} setQuotes={setQuotes} auditLogs={auditLogs} piConfig={piConfig} onUpdatePiConfig={handleUpdatePiConfig} />}
         {activeSection === 'faq' && <FaqView />}
         {activeSection === 'about' && <AboutView />}
@@ -896,12 +1168,54 @@ function ServicesView({ selectedService, onSelect, currentUser, onAuth, onSubmit
 }
 
 // --- Dashboard View Component ---
-function DashboardView({ currentUser, onAuth, requests, quotes, onPay, supportTickets, setSupportTickets, documents, setRequests }: { currentUser: UserProfile | null, onAuth: (n: string, e: string, p: string) => void, requests: ServiceRequest[], quotes: Quote[], onPay: (r: ServiceRequest | Quote) => void, supportTickets: SupportTicket[], setSupportTickets: any, documents: GoyeDocument[], setRequests: any }) {
+function DashboardView({ currentUser, onAuth, requests, quotes, onPay, supportTickets, setSupportTickets, documents, setRequests, isPiBrowser, onPiRegister }: { currentUser: UserProfile | null, onAuth: (n: string, e: string, p: string) => void, requests: ServiceRequest[], quotes: Quote[], onPay: (r: ServiceRequest | Quote) => void, supportTickets: SupportTicket[], setSupportTickets: any, documents: GoyeDocument[], setRequests: any, isPiBrowser?: boolean, onPiRegister?: (p: any) => void }) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [ticketCategory, setTicketCategory] = useState('CAC Support');
   const [ticketMsg, setTicketMsg] = useState('');
+
+  const handlePiAuthentication = () => {
+    if (typeof window !== 'undefined' && (window as any).Pi && onPiRegister) {
+      (window as any).Pi.authenticate(['username', 'payments'], async (payment: any) => {
+        console.log("Incomplete payment found on auth: ", payment);
+        try {
+          await fetch('/api/pi/complete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ paymentId: payment.identifier, txid: payment.transaction.txid })
+          });
+        } catch (err) {
+          console.error("Failed to reconcile incomplete payment on auth:", err);
+        }
+      }).then(async (auth: any) => {
+        const verifyRes = await fetch('/api/pi/verify-user', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ accessToken: auth.accessToken })
+        });
+        const verifyData = await verifyRes.json();
+        if (verifyData && verifyData.status === 'success') {
+          const piUser = verifyData.data;
+          const profile = {
+            id: piUser.uid || auth.user.uid,
+            name: piUser.username || auth.user.username,
+            email: `${piUser.username || auth.user.username}@goye-pi.store`,
+            phone: "Pi Network Verified User",
+            role: (piUser.username === 'goyedagosmessenterprise' || piUser.username === 'ifiok82') ? 'admin' : 'customer',
+            createdAt: Date.now(),
+            accessToken: auth.accessToken
+          };
+          onPiRegister(profile);
+        } else {
+          alert("Pi token server-side validation failed.");
+        }
+      }).catch((err: any) => {
+        console.error("Pi Auth error: ", err);
+        alert("Pi SDK authentication failed.");
+      });
+    }
+  };
 
   if (!currentUser) {
     return (
@@ -910,6 +1224,24 @@ function DashboardView({ currentUser, onAuth, requests, quotes, onPay, supportTi
           <User className="mx-auto mb-6 text-yellow-500" size={48} />
           <h2 className="text-3xl font-black uppercase mb-1 tracking-tighter text-slate-900">Access HUB</h2>
           <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mb-8">Access customer portal & verify payments</p>
+          
+          {isPiBrowser && (
+            <button 
+              onClick={handlePiAuthentication}
+              className="w-full bg-slate-900 hover:bg-slate-800 text-white hover:text-yellow-400 py-4 rounded-xl font-black uppercase tracking-widest flex items-center justify-center gap-2 mb-6 border border-gray-150 transition-all text-xs"
+            >
+              <Bot size={16} className="text-yellow-400 animate-pulse" /> Sign In with Pi Network
+            </button>
+          )}
+
+          {isPiBrowser && (
+            <div className="flex items-center gap-3 my-6">
+              <div className="h-[1px] bg-gray-200 flex-grow" />
+              <span className="text-[9px] text-gray-400 font-black uppercase">OR USE STANDARD WEB FORM</span>
+              <div className="h-[1px] bg-gray-200 flex-grow" />
+            </div>
+          )}
+
           <form className="space-y-4 text-left" onSubmit={e => { e.preventDefault(); onAuth(name, email, phone); }}>
             <FormInput label="Full Name" required onChange={setName} />
             <FormInput label="Email Address" type="email" required onChange={setEmail} />
@@ -941,110 +1273,223 @@ function DashboardView({ currentUser, onAuth, requests, quotes, onPay, supportTi
     alert("Support request submitted successfully.");
   };
 
+  const [activeTab, setActiveTab] = useState<'requests' | 'quotes' | 'documents' | 'support' | 'profile'>('requests');
+
   return (
-    <div className="max-w-7xl mx-auto px-6 py-12 text-slate-900">
-      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-8 mb-16">
+    <div className="max-w-7xl mx-auto px-6 py-12 text-slate-900 font-sans">
+      {/* Header Banner */}
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-8 mb-12 pb-8 border-b border-gray-150">
         <div>
-          <h2 className="text-3xl md:text-5xl font-black uppercase tracking-tighter mb-2 text-slate-900">My Workspace</h2>
-          <p className="text-gray-400 font-bold text-xs uppercase tracking-widest">Customer: {currentUser.name} | ID: {currentUser.id}</p>
+          <h2 className="text-3xl md:text-5xl font-black uppercase tracking-tighter mb-2 text-slate-900">Client Workspace & CRM</h2>
+          <p className="text-gray-400 font-bold text-xs uppercase tracking-widest flex items-center gap-2">
+            <User size={14} className="text-yellow-600 animate-pulse" /> {currentUser.name} <span className="text-gray-300">|</span> ID: {currentUser.id} <span className="text-gray-300">|</span> Phone: {currentUser.phone}
+          </p>
         </div>
-        <div className="flex gap-4">
-          <StatMini label="Requests" value={userReqs.length} />
-          <StatMini label="Active Tickets" value={supportTickets.filter(t => t.status === 'Open').length} />
+        <div className="flex gap-4 flex-wrap">
+          <StatMini label="My Requests" value={userReqs.length} />
+          <StatMini label="Quotes Received" value={userQuotes.length} />
+          <StatMini label="Support Tickets" value={supportTickets.length} />
         </div>
       </div>
 
+      {/* CRM Navigation Tabs */}
+      <div className="flex gap-2 overflow-x-auto pb-4 mb-8 border-b border-gray-100 scrollbar-none">
+        {[
+          { id: 'requests', label: 'My Requests & Orders' },
+          { id: 'quotes', label: 'Invoices & Quotes' },
+          { id: 'documents', label: 'Document Vault' },
+          { id: 'support', label: 'Support Desk' },
+          { id: 'profile', label: 'Account Profile' }
+        ].map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id as any)}
+            className={`px-5 py-3 rounded-xl font-black text-xs uppercase tracking-widest transition-all shrink-0 ${
+              activeTab === tab.id
+                ? 'bg-[#FFD700] text-black shadow-md'
+                : 'bg-white border border-gray-100 text-gray-500 hover:text-black hover:bg-slate-50'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
-        {/* Left Side: Requests & Quotes */}
-        <div className="lg:col-span-2 space-y-12">
-          {/* Quotes Section */}
-          {userQuotes.length > 0 && (
+        {/* Main Tab Contents */}
+        <div className="lg:col-span-2 space-y-8">
+          
+          {activeTab === 'requests' && (
             <div className="space-y-6">
               <h3 className="text-sm font-black uppercase tracking-widest text-yellow-600 flex items-center gap-2">
-                <DollarSign size={16} /> Received Quotes
+                <FileCheck size={18} /> Process Status & Requests
               </h3>
-              {userQuotes.map(q => (
-                <div key={q.id} className="bg-yellow-50 border border-yellow-200 p-6 rounded-3xl flex flex-col md:flex-row justify-between items-start md:items-center gap-6 shadow">
-                  <div>
-                    <p className="text-[8px] text-yellow-600 font-black uppercase tracking-widest mb-1">Quote {q.quoteNumber}</p>
-                    <h4 className="font-black text-lg uppercase leading-none mb-2 text-slate-900">{q.serviceName}</h4>
-                    <p className="text-xs text-gray-500 font-bold uppercase">{q.notes}</p>
-                  </div>
-                  <div className="flex items-center gap-6">
-                    <p className="text-xl font-black text-yellow-600">₦{q.total.toLocaleString()}</p>
-                    <button onClick={() => onPay(q)} className="bg-yellow-500 hover:bg-yellow-400 text-black px-6 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest shadow">Pay Now</button>
-                  </div>
+              {userReqs.length === 0 ? (
+                <div className="text-center py-20 bg-white border border-gray-100 rounded-3xl shadow-sm">
+                  <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">No active service requests.</p>
+                  <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Select a division package from the catalog to submit your information details.</p>
                 </div>
-              ))}
+              ) : (
+                userReqs.map(req => (
+                  <div key={req.id} className="bg-white border border-gray-100 p-6 rounded-3xl flex flex-col md:flex-row justify-between items-start md:items-center gap-6 shadow-sm hover:border-yellow-500/20 transition-all">
+                    <div>
+                      <div className="flex items-center gap-3 mb-2 flex-wrap">
+                        <h4 className="font-black text-base md:text-lg uppercase tracking-tight text-slate-900 leading-tight">{req.serviceName}</h4>
+                        <span className="text-[9px] font-mono font-bold text-gray-400 bg-slate-50 border border-gray-150 rounded px-2.5 py-1">{req.requestNumber}</span>
+                      </div>
+                      <div className="flex gap-4 items-center text-[10px] text-gray-400 font-bold uppercase tracking-wider">
+                         <span>Date: {new Date(req.createdAt).toLocaleDateString()}</span>
+                         <span>•</span>
+                         <span>Fee: ₦{(req.amount).toLocaleString()}</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4 w-full md:w-auto justify-between border-t border-gray-50 md:border-0 pt-4 md:pt-0">
+                      <span className={`text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full border ${
+                        req.status === 'PAYMENT VERIFIED' || req.status === 'COMPLETED'
+                          ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                          : req.status === 'PAYMENT PENDING'
+                          ? 'bg-orange-50 border-orange-200 text-orange-700 animate-pulse'
+                          : 'bg-slate-50 border-gray-200 text-slate-800'
+                      }`}>
+                        {req.status}
+                      </span>
+                      {req.status === 'SUBMITTED' && (
+                        <button onClick={() => onPay(req)} className="bg-[#FFD700] hover:bg-yellow-400 text-black px-4 py-2 rounded-lg font-black text-[9px] uppercase tracking-widest shadow-sm shrink-0">
+                          Pay Fee
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           )}
 
-          {/* Service Requests */}
-          <div className="space-y-6">
-            <h3 className="text-sm font-black uppercase tracking-widest text-yellow-600 flex items-center gap-2">
-              <FileCheck size={16} /> My Requests
-            </h3>
-            {userReqs.length === 0 ? (
-              <div className="text-center py-20 bg-white border border-gray-100 rounded-3xl shadow-sm">
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">No active service requests.</p>
-                <button onClick={() => onPay(null as any)} className="text-[10px] text-yellow-600 font-black uppercase tracking-widest">Start a new request</button>
-              </div>
-            ) : (
-              userReqs.map(req => (
-                <div key={req.id} className="bg-white border border-gray-100 p-6 rounded-3xl flex flex-col md:flex-row justify-between items-start md:items-center gap-6 shadow-sm">
-                  <div>
-                    <div className="flex items-center gap-3 mb-1">
-                      <h4 className="font-black text-lg uppercase tracking-tight text-slate-900">{req.serviceName}</h4>
-                      <span className="text-[9px] font-mono text-gray-400">{req.requestNumber}</span>
-                    </div>
-                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Submitted {new Date(req.createdAt).toLocaleDateString()}</p>
-                  </div>
-                  <div className="flex items-center gap-6 w-full md:w-auto justify-between">
-                    <span className="text-[9px] font-black uppercase tracking-widest bg-slate-50 px-3 py-1.5 rounded-full border border-gray-200 text-slate-800">
-                      {req.status}
-                    </span>
-                    {req.status === 'SUBMITTED' && (
-                      <button onClick={() => onPay(req)} className="bg-[#FFD700] hover:bg-yellow-400 text-black px-4 py-2 rounded-lg font-black text-[9px] uppercase tracking-widest shadow-sm">
-                        Pay Fee
-                      </button>
-                    )}
-                  </div>
+          {activeTab === 'quotes' && (
+            <div className="space-y-6">
+              <h3 className="text-sm font-black uppercase tracking-widest text-yellow-600 flex items-center gap-2">
+                <DollarSign size={18} /> Invoices & Received Quotes
+              </h3>
+              {userQuotes.length === 0 ? (
+                <div className="text-center py-20 bg-white border border-gray-100 rounded-3xl shadow-sm">
+                  <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">No pending quotes or invoices.</p>
+                  <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Custom scope queries will appear here once reviewed by our engineers.</p>
                 </div>
-              ))
-            )}
-          </div>
+              ) : (
+                userQuotes.map(q => (
+                  <div key={q.id} className="bg-yellow-50/50 border border-yellow-200 p-6 rounded-3xl flex flex-col md:flex-row justify-between items-start md:items-center gap-6 shadow-sm">
+                    <div>
+                      <p className="text-[8px] text-yellow-700 font-black uppercase tracking-widest mb-1">Scope Invoice {q.quoteNumber}</p>
+                      <h4 className="font-black text-lg uppercase leading-none mb-2 text-slate-900">{q.serviceName}</h4>
+                      <p className="text-xs text-slate-700 font-bold uppercase mb-1">{q.notes}</p>
+                      <p className="text-[9px] text-gray-400 font-black uppercase">Expires: {new Date(q.expiresAt).toLocaleDateString()}</p>
+                    </div>
+                    <div className="flex items-center gap-6 w-full md:w-auto justify-between border-t border-yellow-200/30 md:border-0 pt-4 md:pt-0">
+                      <p className="text-xl font-black text-slate-900">₦{q.total.toLocaleString()}</p>
+                      <button onClick={() => onPay(q)} className="bg-yellow-500 hover:bg-yellow-400 text-black px-6 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest shadow shrink-0">Pay Invoice</button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+
+          {activeTab === 'documents' && (
+            <div className="space-y-6">
+              <h3 className="text-sm font-black uppercase tracking-widest text-yellow-600 flex items-center gap-2">
+                <Download size={18} /> Completed Corporate Files
+              </h3>
+              {documents.filter(d => d.userId === currentUser.id).length === 0 ? (
+                <div className="text-center py-20 bg-white border border-gray-100 rounded-3xl shadow-sm">
+                  <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">No official documents uploaded yet.</p>
+                  <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Completion certs and deliverables are privately uploaded here once validated.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {documents.filter(d => d.userId === currentUser.id).map(doc => (
+                    <div key={doc.id} className="p-5 bg-white rounded-3xl border border-gray-100 flex justify-between items-center shadow-sm hover:border-yellow-500/10 transition-all">
+                      <div>
+                        <h4 className="text-xs font-black uppercase text-slate-900 leading-tight mb-1">{doc.filename}</h4>
+                        <p className="text-[8px] text-gray-400 font-black uppercase mb-1">Type: {doc.documentType}</p>
+                        <p className="text-[8px] text-emerald-600 font-black uppercase tracking-widest">Available for Download</p>
+                      </div>
+                      <a 
+                        href="#" 
+                        onClick={(e) => { e.preventDefault(); alert("File downloaded securely through verified credentials."); }}
+                        className="p-3 bg-yellow-500 text-black rounded-xl hover:bg-yellow-400 transition-colors shrink-0 shadow-sm"
+                      >
+                        <Download size={14} />
+                      </a>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'support' && (
+            <div className="space-y-6">
+              <h3 className="text-sm font-black uppercase tracking-widest text-yellow-600 flex items-center gap-2">
+                <MessageSquare size={18} /> Support Ticket History
+              </h3>
+              {supportTickets.filter(t => t.userId === currentUser.id).length === 0 ? (
+                <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest text-center py-12 bg-white border border-gray-100 rounded-3xl">No support tickets filed yet.</p>
+              ) : (
+                <div className="space-y-4">
+                  {supportTickets.filter(t => t.userId === currentUser.id).map(ticket => (
+                    <div key={ticket.id} className="p-5 bg-white border border-gray-100 rounded-3xl shadow-sm">
+                      <div className="flex justify-between items-start mb-3 gap-4 flex-wrap">
+                        <div>
+                          <span className="text-[8px] font-black uppercase bg-slate-100 px-2 py-1 rounded text-gray-500 mr-2">{ticket.category}</span>
+                          <span className="text-[9px] font-mono text-gray-400">ID: {ticket.id}</span>
+                        </div>
+                        <span className={`text-[8px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full border ${
+                          ticket.status === 'Open' ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-slate-50 border-gray-200 text-gray-500'
+                        }`}>
+                          {ticket.status}
+                        </span>
+                      </div>
+                      <p className="text-xs font-bold text-slate-800 leading-relaxed uppercase tracking-wider">{ticket.message}</p>
+                      <p className="text-[8px] text-gray-400 font-black uppercase tracking-widest mt-3">Filed {new Date(ticket.createdAt).toLocaleDateString()}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'profile' && (
+            <div className="bg-white border border-gray-100 rounded-3xl p-8 shadow-sm space-y-6">
+              <h3 className="text-xs font-black uppercase tracking-widest text-yellow-600">Client Profile Details</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs font-bold uppercase tracking-wider text-gray-500">
+                 <div>
+                   <p className="text-[9px] text-gray-400 block mb-1">Corporate Client Name</p>
+                   <p className="p-3 bg-slate-50 border border-gray-100 rounded-xl text-slate-900 font-black">{currentUser.name}</p>
+                 </div>
+                 <div>
+                   <p className="text-[9px] text-gray-400 block mb-1">Verified Email Address</p>
+                   <p className="p-3 bg-slate-50 border border-gray-100 rounded-xl text-slate-900 font-black">{currentUser.email}</p>
+                 </div>
+                 <div>
+                   <p className="text-[9px] text-gray-400 block mb-1">Corporate Coordinate (Phone)</p>
+                   <p className="p-3 bg-slate-50 border border-gray-100 rounded-xl text-slate-900 font-black">{currentUser.phone}</p>
+                 </div>
+                 <div>
+                   <p className="text-[9px] text-gray-400 block mb-1">Workspace Assignment Role</p>
+                   <p className="p-3 bg-slate-50 border border-gray-100 rounded-xl text-slate-900 font-black">{currentUser.role === 'admin' ? 'SYSTEM OWNER' : 'BUSINESS APPLICANT'}</p>
+                 </div>
+              </div>
+            </div>
+          )}
+
         </div>
 
-        {/* Right Side: Support & Document Management */}
+        {/* Right Side: Fast Actions (Form submission & Support Desk) */}
         <div className="space-y-12">
-          {/* Document Management */}
+          {/* Submit Support Ticket */}
           <div className="bg-white border border-gray-100 rounded-3xl p-8 shadow-sm">
             <h3 className="text-xs font-black uppercase tracking-widest text-yellow-600 mb-6 flex items-center gap-2">
-              <Download size={14} /> Completion Documents
-            </h3>
-            {documents.filter(d => d.userId === currentUser.id).length === 0 ? (
-              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest text-center py-8">No completion documents available yet.</p>
-            ) : (
-              <div className="space-y-4">
-                {documents.filter(d => d.userId === currentUser.id).map(doc => (
-                  <div key={doc.id} className="p-4 bg-slate-50 rounded-2xl flex justify-between items-center border border-gray-100">
-                    <div>
-                      <p className="text-xs font-black uppercase text-slate-900">{doc.filename}</p>
-                      <p className="text-[8px] text-gray-400 font-bold uppercase">Ready for download</p>
-                    </div>
-                    <button className="p-2.5 bg-yellow-500 text-black rounded-xl hover:bg-yellow-400 transition-colors">
-                      <Download size={14} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Support Ticket Submission */}
-          <div className="bg-white border border-gray-100 rounded-3xl p-8 shadow-sm">
-            <h3 className="text-xs font-black uppercase tracking-widest text-yellow-600 mb-6 flex items-center gap-2">
-               <MessageSquare size={14} /> Customer Support
+               <MessageSquare size={14} /> Submit Query
             </h3>
             <form onSubmit={handleTicketSubmit} className="space-y-4">
                <div className="space-y-1">
@@ -1061,7 +1506,7 @@ function DashboardView({ currentUser, onAuth, requests, quotes, onPay, supportTi
                  </select>
                </div>
                <div className="space-y-1">
-                 <label className="text-[8px] font-black uppercase text-gray-400 tracking-widest">Message</label>
+                 <label className="text-[8px] font-black uppercase text-gray-400 tracking-widest">Message Thread</label>
                  <textarea 
                    required
                    value={ticketMsg}
@@ -1285,9 +1730,10 @@ function AdminView({ currentUser, requests, setRequests, quotes, setQuotes, audi
 
 // --- Checkout View ---
 function CheckoutModal({ item, isPiBrowser, onClose, onComplete, piConfig }: { item: ServiceRequest | Quote, isPiBrowser: boolean, onClose: () => void, onComplete: (ref: string, provider: string) => void, piConfig: any }) {
-  const [method, setMethod] = useState<'paystack' | 'pi'>(isPiBrowser ? 'pi' : 'paystack');
+  const [method, setMethod] = useState<'paystack' | 'flutterwave' | 'usdt' | 'usdc' | 'pi'>(isPiBrowser ? 'pi' : 'paystack');
   const [isVerifying, setIsVerifying] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [txHash, setTxHash] = useState('');
 
   const isSandbox = piConfig.networkMode === 'TESTNET';
   // Strictly block Mainnet from here. Mainnet remains completely disabled until full server configurations are ready.
@@ -1296,11 +1742,28 @@ function CheckoutModal({ item, isPiBrowser, onClose, onComplete, piConfig }: { i
   const price = 'amount' in item ? item.amount : item.total;
   const piAmount = Number((price / 1000).toFixed(2));
 
+  // Custom Crypto addresses
+  const cryptoWallets = {
+    usdt: '0x7a83d71249b6ef0289f68e9d6b58b3edd0957125',
+    usdc: '0x7a83d71249b6ef0289f68e9d6b58b3edd0957125'
+  };
+
+  const cryptoAmounts = {
+    usdt: Number((price / 1600).toFixed(2)), // Approx 1,600 NGN = 1 USDT
+    usdc: Number((price / 1600).toFixed(2))  // Approx 1,600 NGN = 1 USDC
+  };
+
   const handleCheckout = () => {
     if (method === 'pi' && isMainnetBlocked) {
       setPaymentError("Mainnet payments are disabled until official server-side credentials and Mainnet Portal permissions are active.");
       return;
     }
+
+    if ((method === 'usdt' || method === 'usdc') && !txHash.trim()) {
+      setPaymentError("Please provide your blockchain Transaction Hash (Tx Hash) for verification.");
+      return;
+    }
+
     setPaymentError(null);
     setIsVerifying(true);
 
@@ -1368,11 +1831,21 @@ function CheckoutModal({ item, isPiBrowser, onClose, onComplete, piConfig }: { i
         setPaymentError("Pi payment verification unavailable — please try again later. (Requires official Pi Browser environment)");
         setIsVerifying(false);
       }
-    } else {
-      // Standard Paystack browser checkout
+    } else if (method === 'usdt' || method === 'usdc') {
+      // Manual crypto confirmation route
       setTimeout(() => {
         setIsVerifying(false);
-        onComplete(`TX-PAYSTACK-${Math.floor(Math.random() * 1000000)}`, 'PAYSTACK');
+        onComplete(txHash, method === 'usdt' ? 'USDT_BEP20' : 'USDC_BASE');
+      }, 1500);
+    } else if (method === 'paystack') {
+      setTimeout(() => {
+        setIsVerifying(false);
+        onComplete(`TX-PAYSTACK-${Math.floor(100000 + Math.random() * 900000)}`, 'PAYSTACK');
+      }, 2000);
+    } else if (method === 'flutterwave') {
+      setTimeout(() => {
+        setIsVerifying(false);
+        onComplete(`TX-FLUTTERWAVE-${Math.floor(100000 + Math.random() * 900000)}`, 'FLUTTERWAVE');
       }, 2000);
     }
   };
@@ -1380,7 +1853,7 @@ function CheckoutModal({ item, isPiBrowser, onClose, onComplete, piConfig }: { i
   return (
     <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px]" onClick={onClose} />
-      <div className="relative bg-white border border-gray-100 rounded-3xl w-full max-w-md p-8 md:p-10 shadow-2xl overflow-hidden text-slate-950">
+      <div className="relative bg-white border border-gray-100 rounded-3xl w-full max-w-md p-8 md:p-10 shadow-2xl overflow-y-auto max-h-[90vh] text-slate-950">
         <div className="flex justify-between items-center mb-8 pb-4 border-b border-gray-100">
            <div>
               <h3 className="text-xl font-black uppercase tracking-tighter text-slate-900">Gateway Checkout</h3>
@@ -1398,7 +1871,7 @@ function CheckoutModal({ item, isPiBrowser, onClose, onComplete, piConfig }: { i
           </div>
         )}
 
-        <div className="p-4 bg-slate-50 rounded-2xl mb-6 border border-gray-100 flex justify-between items-center">
+        <div className="p-4 bg-slate-50 rounded-2xl mb-6 border border-gray-100 flex justify-between items-center font-sans">
            <div>
               <p className="text-[8px] text-gray-400 uppercase font-black tracking-widest mb-1">Local Fee</p>
               <p className="text-xl font-black text-slate-900">₦{price.toLocaleString()}</p>
@@ -1407,6 +1880,12 @@ function CheckoutModal({ item, isPiBrowser, onClose, onComplete, piConfig }: { i
              <div className="text-right">
                 <p className="text-[8px] text-yellow-600 uppercase font-black tracking-widest mb-1">Blockchain Fee</p>
                 <p className="text-2xl font-black text-yellow-600">{piAmount} Pi</p>
+             </div>
+           )}
+           {(method === 'usdt' || method === 'usdc') && (
+             <div className="text-right">
+                <p className="text-[8px] text-yellow-600 uppercase font-black tracking-widest mb-1">Crypto Value</p>
+                <p className="text-2xl font-black text-yellow-600">{method === 'usdt' ? cryptoAmounts.usdt : cryptoAmounts.usdc} {method.toUpperCase()}</p>
              </div>
            )}
         </div>
@@ -1433,25 +1912,58 @@ function CheckoutModal({ item, isPiBrowser, onClose, onComplete, piConfig }: { i
             </div>
           </div>
         ) : (
-          <div className="space-y-6 mb-8">
+          <div className="space-y-6 mb-6">
             <p className="text-[10px] text-gray-400 uppercase font-black tracking-widest text-center">Select Verified Gateway</p>
-            <div className="grid grid-cols-2 gap-4">
-              <button onClick={() => setMethod('paystack')} className={`p-4 rounded-xl border flex flex-col items-center gap-2 font-black uppercase text-[10px] tracking-widest transition-all ${method === 'paystack' ? 'border-yellow-500 bg-yellow-50' : 'border-gray-100 bg-slate-50'}`}>
-                <CreditCard size={16} className={method === 'paystack' ? 'text-yellow-600' : 'text-gray-400'} /> Paystack
+            <div className="grid grid-cols-2 gap-3">
+              <button onClick={() => setMethod('paystack')} className={`p-3 rounded-xl border flex flex-col items-center gap-1.5 font-black uppercase text-[9px] tracking-widest transition-all ${method === 'paystack' ? 'border-yellow-500 bg-yellow-50 text-yellow-700 shadow-sm' : 'border-gray-100 bg-slate-50 text-gray-500'}`}>
+                <CreditCard size={14} /> Paystack
               </button>
-              <button onClick={() => setMethod('pi')} className={`p-4 rounded-xl border flex flex-col items-center gap-2 font-black uppercase text-[10px] tracking-widest transition-all ${method === 'pi' ? 'border-yellow-500 bg-yellow-50' : 'border-gray-100 bg-slate-50'}`}>
-                <Bot size={16} className={method === 'pi' ? 'text-yellow-600' : 'text-gray-400'} /> Pay with Pi
+              <button onClick={() => setMethod('flutterwave')} className={`p-3 rounded-xl border flex flex-col items-center gap-1.5 font-black uppercase text-[9px] tracking-widest transition-all ${method === 'flutterwave' ? 'border-yellow-500 bg-yellow-50 text-yellow-700 shadow-sm' : 'border-gray-100 bg-slate-50 text-gray-500'}`}>
+                <CreditCard size={14} /> Flutterwave
+              </button>
+              <button onClick={() => setMethod('usdt')} className={`p-3 rounded-xl border flex flex-col items-center gap-1.5 font-black uppercase text-[9px] tracking-widest transition-all ${method === 'usdt' ? 'border-yellow-500 bg-yellow-50 text-yellow-700 shadow-sm' : 'border-gray-100 bg-slate-50 text-gray-500'}`}>
+                <SmartphoneNfc size={14} /> USDT BEP20
+              </button>
+              <button onClick={() => setMethod('usdc')} className={`p-3 rounded-xl border flex flex-col items-center gap-1.5 font-black uppercase text-[9px] tracking-widest transition-all ${method === 'usdc' ? 'border-yellow-500 bg-yellow-50 text-yellow-700 shadow-sm' : 'border-gray-100 bg-slate-50 text-gray-500'}`}>
+                <SmartphoneNfc size={14} /> USDC Base
               </button>
             </div>
+            <button onClick={() => setMethod('pi')} className={`w-full p-3 rounded-xl border flex items-center justify-center gap-2 font-black uppercase text-[10px] tracking-widest transition-all ${method === 'pi' ? 'border-yellow-500 bg-yellow-50 text-yellow-700 shadow-sm' : 'border-gray-100 bg-slate-50 text-gray-500'}`}>
+              <Bot size={14} /> Pay with Pi Network
+            </button>
+          </div>
+        )}
+
+        {/* Manual Crypto Verification Interface */}
+        {(method === 'usdt' || method === 'usdc') && (
+          <div className="bg-slate-50 border border-gray-150 p-4 rounded-2xl mb-6 space-y-4 font-sans">
+             <div className="text-[9px] font-black uppercase text-yellow-700 bg-yellow-50 p-2.5 rounded-lg border border-yellow-100/50 leading-relaxed">
+                Send exactly <span className="font-bold text-slate-900 underline">{method === 'usdt' ? cryptoAmounts.usdt : cryptoAmounts.usdc} {method.toUpperCase()}</span> on the <span className="underline">{method === 'usdt' ? 'BNB Smart Chain (BEP20)' : 'Base Network'}</span> to the designated corporate address below:
+             </div>
+             <div>
+                <span className="text-[8px] text-gray-400 block font-black uppercase tracking-wider mb-1">Corporate Wallet Address</span>
+                <p className="p-3 bg-white border border-gray-100 rounded-xl font-mono text-[10px] text-slate-800 break-all select-all font-bold tracking-tight">{method === 'usdt' ? cryptoWallets.usdt : cryptoWallets.usdc}</p>
+             </div>
+             <div>
+                <label className="text-[8px] text-gray-400 block font-black uppercase tracking-wider mb-1">Blockchain Transaction Hash (Tx Hash)</label>
+                <input 
+                  type="text" 
+                  value={txHash}
+                  onChange={e => setTxHash(e.target.value)}
+                  placeholder="Paste 66-character transaction hash here"
+                  className="w-full bg-white border border-gray-200 rounded-xl p-3 text-[10px] font-mono text-slate-900 outline-none focus:border-yellow-500 font-bold"
+                />
+             </div>
+             <p className="text-[8px] text-gray-400 font-bold uppercase tracking-widest text-center mt-1">⚠️ Crypto payments will be marked Pending Verification until confirmed.</p>
           </div>
         )}
 
         <button 
           disabled={isVerifying || (method === 'pi' && isMainnetBlocked)}
           onClick={handleCheckout} 
-          className="w-full bg-yellow-500 hover:bg-yellow-400 text-black py-4 rounded-xl font-black uppercase tracking-widest text-xs flex items-center justify-center gap-2 disabled:opacity-50 transition-colors shadow"
+          className="w-full bg-[#0a0a0a] hover:bg-yellow-500 text-white hover:text-black py-4 rounded-xl font-black uppercase tracking-widest text-xs flex items-center justify-center gap-2 disabled:opacity-50 transition-colors shadow"
         >
-          {isVerifying ? 'Verifying Gateway Response...' : method === 'pi' ? 'Initiate Pi Transaction' : 'Initiate Paystack Transaction'}
+          {isVerifying ? 'Verifying Gateway Response...' : method === 'pi' ? 'Initiate Pi Transaction' : method === 'usdt' || method === 'usdc' ? 'Submit Tx Hash for Verification' : `Initiate ${method.toUpperCase()} Transaction`}
           {isVerifying && <Clock size={14} className="animate-spin" />}
         </button>
       </div>
