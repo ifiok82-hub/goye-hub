@@ -128,9 +128,13 @@ async function createServer() {
       status: 'CONNECTED',
       database: 'CONNECTED_LOCAL_RECONCILIATION',
       paymentGateways: {
-        paystack: PAYSTACK_SECRET_KEY ? 'CONFIGURED' : 'NOT CONFIGURED',
-        flutterwave: FLUTTERWAVE_SECRET_KEY ? 'CONFIGURED' : 'NOT CONFIGURED',
-        piPlatform: PI_API_KEY ? 'CONFIGURED' : 'NOT CONFIGURED'
+        paystack_public: PAYSTACK_PUBLIC_KEY ? 'CONFIGURED' : 'NOT CONFIGURED',
+        paystack_secret: PAYSTACK_SECRET_KEY ? 'CONFIGURED' : 'NOT CONFIGURED',
+        flutterwave_public: FLUTTERWAVE_PUBLIC_KEY ? 'CONFIGURED' : 'NOT CONFIGURED',
+        flutterwave_secret: FLUTTERWAVE_SECRET_KEY ? 'CONFIGURED' : 'NOT CONFIGURED',
+        usdt_bep20: 'CONFIGURED', // Hardcoded wallet address present
+        usdc_base: 'CONFIGURED',   // Hardcoded wallet address present
+        pi_api_key: PI_API_KEY ? 'CONFIGURED' : 'NOT CONFIGURED'
       },
       piNetwork: {
         testnetMode: 'ACTIVE',

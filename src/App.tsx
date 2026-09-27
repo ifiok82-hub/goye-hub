@@ -1533,6 +1533,15 @@ function AdminView({ currentUser, requests, setRequests, quotes, setQuotes, audi
   const [quoteAmount, setQuoteAmount] = useState<number>(0);
   const [quoteNotes, setQuoteNotes] = useState('');
 
+  const [healthMetrics, setHealthMetrics] = useState<any>(null);
+
+  useEffect(() => {
+    fetch('/api/health')
+      .then(res => res.json())
+      .then(data => setHealthMetrics(data))
+      .catch(err => console.warn("Could not load payment status", err));
+  }, []);
+
   if (!currentUser || currentUser.role !== 'admin') {
     return <div className="text-center py-24 text-red-500 uppercase font-black tracking-widest">Access Restricted to Administrators</div>;
   }
@@ -1708,6 +1717,57 @@ function AdminView({ currentUser, requests, setRequests, quotes, setQuotes, audi
             </div>
           </div>
 
+          {/* Payments Security & Config Debug Panel */}
+          <div className="bg-white border border-gray-100 rounded-3xl p-8 shadow-sm space-y-6">
+            <h3 className="text-xs font-black uppercase tracking-widest text-slate-900 flex items-center gap-2">
+              <CreditCard size={16} className="text-yellow-600 animate-pulse" /> Payments Config Audit
+            </h3>
+            <div className="space-y-3.5 text-[10px] font-bold uppercase tracking-wider text-gray-500">
+               <div className="flex justify-between items-center p-2.5 bg-slate-50 border border-gray-100 rounded-xl">
+                 <span className="text-[9px] text-gray-400 font-black">PAYSTACK_PUBLIC_KEY</span>
+                 <span className={`px-2 py-0.5 rounded-full text-[8px] font-black tracking-widest ${import.meta.env.VITE_PAYSTACK_PUBLIC_KEY ? 'bg-emerald-50 text-emerald-700 border border-emerald-150' : 'bg-red-50 text-red-700 border border-red-150'}`}>
+                   {import.meta.env.VITE_PAYSTACK_PUBLIC_KEY ? 'CONFIGURED' : 'NOT CONFIGURED'}
+                 </span>
+               </div>
+               <div className="flex justify-between items-center p-2.5 bg-slate-50 border border-gray-100 rounded-xl">
+                 <span className="text-[9px] text-gray-400 font-black">PAYSTACK_SECRET_KEY</span>
+                 <span className={`px-2 py-0.5 rounded-full text-[8px] font-black tracking-widest ${healthMetrics?.paymentGateways?.paystack_secret === 'CONFIGURED' ? 'bg-emerald-50 text-emerald-700 border border-emerald-150' : 'bg-red-50 text-red-700 border border-red-150'}`}>
+                   {healthMetrics?.paymentGateways?.paystack_secret || 'NOT CONFIGURED'}
+                 </span>
+               </div>
+               <div className="flex justify-between items-center p-2.5 bg-slate-50 border border-gray-100 rounded-xl">
+                 <span className="text-[9px] text-gray-400 font-black">FLUTTERWAVE_PUBLIC_KEY</span>
+                 <span className={`px-2 py-0.5 rounded-full text-[8px] font-black tracking-widest ${import.meta.env.VITE_FLUTTERWAVE_PUBLIC_KEY ? 'bg-emerald-50 text-emerald-700 border border-emerald-150' : 'bg-red-50 text-red-700 border border-red-150'}`}>
+                   {import.meta.env.VITE_FLUTTERWAVE_PUBLIC_KEY ? 'CONFIGURED' : 'NOT CONFIGURED'}
+                 </span>
+               </div>
+               <div className="flex justify-between items-center p-2.5 bg-slate-50 border border-gray-100 rounded-xl">
+                 <span className="text-[9px] text-gray-400 font-black">FLUTTERWAVE_SECRET_KEY</span>
+                 <span className={`px-2 py-0.5 rounded-full text-[8px] font-black tracking-widest ${healthMetrics?.paymentGateways?.flutterwave_secret === 'CONFIGURED' ? 'bg-emerald-50 text-emerald-700 border border-emerald-150' : 'bg-red-50 text-red-700 border border-red-150'}`}>
+                   {healthMetrics?.paymentGateways?.flutterwave_secret || 'NOT CONFIGURED'}
+                 </span>
+               </div>
+               <div className="flex justify-between items-center p-2.5 bg-slate-50 border border-gray-100 rounded-xl">
+                 <span className="text-[9px] text-gray-400 font-black">USDT_BEP20</span>
+                 <span className="px-2 py-0.5 rounded-full text-[8px] font-black tracking-widest bg-emerald-50 text-emerald-700 border border-emerald-150">
+                   CONFIGURED
+                 </span>
+               </div>
+               <div className="flex justify-between items-center p-2.5 bg-slate-50 border border-gray-100 rounded-xl">
+                 <span className="text-[9px] text-gray-400 font-black">USDC_BASE</span>
+                 <span className="px-2 py-0.5 rounded-full text-[8px] font-black tracking-widest bg-emerald-50 text-emerald-700 border border-emerald-150">
+                   CONFIGURED
+                 </span>
+               </div>
+               <div className="flex justify-between items-center p-2.5 bg-slate-50 border border-gray-100 rounded-xl">
+                 <span className="text-[9px] text-gray-400 font-black">PI_API_KEY</span>
+                 <span className={`px-2 py-0.5 rounded-full text-[8px] font-black tracking-widest ${healthMetrics?.paymentGateways?.pi_api_key === 'CONFIGURED' ? 'bg-emerald-50 text-emerald-700 border border-emerald-150' : 'bg-red-50 text-red-700 border border-red-150'}`}>
+                   {healthMetrics?.paymentGateways?.pi_api_key || 'NOT CONFIGURED'}
+                 </span>
+               </div>
+            </div>
+          </div>
+
           <div className="bg-white border border-gray-100 rounded-3xl p-8 shadow-sm">
             <h3 className="text-xs font-black uppercase tracking-widest mb-6 text-slate-900">Operations Log</h3>
             <div className="space-y-4">
@@ -1735,12 +1795,33 @@ function CheckoutModal({ item, isPiBrowser, onClose, onComplete, piConfig }: { i
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [txHash, setTxHash] = useState('');
 
+  // Fallback console warning if VITE_PAYSTACK_PUBLIC_KEY is missing in frontend
+  useEffect(() => {
+    if (!import.meta.env.VITE_PAYSTACK_PUBLIC_KEY) {
+      console.warn("⚠️ [CONFIGURATION WARNING] VITE_PAYSTACK_PUBLIC_KEY is missing in frontend environment. Rendering payment channel fallbacks.");
+    }
+  }, []);
+
   const isSandbox = piConfig.networkMode === 'TESTNET';
   // Strictly block Mainnet from here. Mainnet remains completely disabled until full server configurations are ready.
   const isMainnetBlocked = !isSandbox;
 
   const price = 'amount' in item ? item.amount : item.total;
   const piAmount = Number((price / 1000).toFixed(2));
+
+  // If no methods are available, show clear fallback message
+  const availableMethods = ['paystack', 'flutterwave', 'usdt', 'usdc', 'pi'];
+  if (availableMethods.length === 0) {
+    return (
+      <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4">
+        <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px]" onClick={onClose} />
+        <div className="relative bg-white border border-gray-100 rounded-3xl w-full max-w-md p-8 shadow-2xl text-center text-slate-950 font-sans">
+          <p className="text-sm font-black uppercase tracking-wider text-red-600 mb-2">Error</p>
+          <p className="text-xs font-bold text-gray-500 uppercase leading-relaxed">Payment methods not configured - Contact admin</p>
+        </div>
+      </div>
+    );
+  }
 
   // Custom Crypto addresses
   const cryptoWallets = {
@@ -1903,36 +1984,49 @@ function CheckoutModal({ item, isPiBrowser, onClose, onComplete, piConfig }: { i
           </div>
         )}
 
-        {/* Enforce Pi-Only experience inside Pi Browser environment */}
-        {isPiBrowser ? (
-          <div className="space-y-6 mb-8">
-            <div className="p-4 bg-yellow-50 border border-yellow-300 rounded-2xl flex items-center justify-between text-yellow-700 shadow-sm">
-              <span className="text-xs font-black uppercase tracking-widest">Pay with Pi SDK (Pi-Only Enforced)</span>
-              <CheckCircle size={16} />
+        {/* Enforce multi-gateway support logic inside both browsers */}
+        <div className="space-y-6 mb-6">
+          <p className="text-[10px] text-gray-400 uppercase font-black tracking-widest text-center">Select Gateway Method</p>
+          
+          {/* Show Pi Network SDK payment button as primary if inside Pi Browser */}
+          {isPiBrowser ? (
+            <div className="space-y-3">
+              <p className="text-[8px] text-yellow-600 uppercase font-black tracking-widest mb-1">⭐ Primary Browser Method</p>
+              <button 
+                onClick={() => setMethod('pi')} 
+                className={`w-full p-4 rounded-xl border flex items-center justify-center gap-2 font-black uppercase text-[11px] tracking-widest transition-all ${method === 'pi' ? 'border-yellow-500 bg-yellow-50 text-yellow-700 shadow-md ring-1 ring-yellow-400' : 'border-gray-200 bg-white text-gray-600 hover:bg-slate-50'}`}
+              >
+                <Bot size={16} className="text-yellow-600 animate-pulse" /> Pay with Pi Network SDK
+              </button>
+              <p className="text-[8px] text-gray-400 uppercase font-black tracking-widest mt-4">💳 Alternative Channels</p>
             </div>
-          </div>
-        ) : (
-          <div className="space-y-6 mb-6">
-            <p className="text-[10px] text-gray-400 uppercase font-black tracking-widest text-center">Select Verified Gateway</p>
-            <div className="grid grid-cols-2 gap-3">
-              <button onClick={() => setMethod('paystack')} className={`p-3 rounded-xl border flex flex-col items-center gap-1.5 font-black uppercase text-[9px] tracking-widest transition-all ${method === 'paystack' ? 'border-yellow-500 bg-yellow-50 text-yellow-700 shadow-sm' : 'border-gray-100 bg-slate-50 text-gray-500'}`}>
-                <CreditCard size={14} /> Paystack
-              </button>
-              <button onClick={() => setMethod('flutterwave')} className={`p-3 rounded-xl border flex flex-col items-center gap-1.5 font-black uppercase text-[9px] tracking-widest transition-all ${method === 'flutterwave' ? 'border-yellow-500 bg-yellow-50 text-yellow-700 shadow-sm' : 'border-gray-100 bg-slate-50 text-gray-500'}`}>
-                <CreditCard size={14} /> Flutterwave
-              </button>
-              <button onClick={() => setMethod('usdt')} className={`p-3 rounded-xl border flex flex-col items-center gap-1.5 font-black uppercase text-[9px] tracking-widest transition-all ${method === 'usdt' ? 'border-yellow-500 bg-yellow-50 text-yellow-700 shadow-sm' : 'border-gray-100 bg-slate-50 text-gray-500'}`}>
-                <SmartphoneNfc size={14} /> USDT BEP20
-              </button>
-              <button onClick={() => setMethod('usdc')} className={`p-3 rounded-xl border flex flex-col items-center gap-1.5 font-black uppercase text-[9px] tracking-widest transition-all ${method === 'usdc' ? 'border-yellow-500 bg-yellow-50 text-yellow-700 shadow-sm' : 'border-gray-100 bg-slate-50 text-gray-500'}`}>
-                <SmartphoneNfc size={14} /> USDC Base
+          ) : (
+            <div className="space-y-2">
+              <button 
+                onClick={() => setMethod('pi')} 
+                className={`w-full p-3.5 rounded-xl border flex items-center justify-center gap-2 font-black uppercase text-[10px] tracking-widest transition-all ${method === 'pi' ? 'border-yellow-500 bg-yellow-50 text-yellow-700 shadow-sm' : 'border-gray-150 bg-slate-50 text-gray-500'}`}
+              >
+                <Bot size={14} className="text-yellow-600" /> Pay with Pi Testnet
               </button>
             </div>
-            <button onClick={() => setMethod('pi')} className={`w-full p-3 rounded-xl border flex items-center justify-center gap-2 font-black uppercase text-[10px] tracking-widest transition-all ${method === 'pi' ? 'border-yellow-500 bg-yellow-50 text-yellow-700 shadow-sm' : 'border-gray-100 bg-slate-50 text-gray-500'}`}>
-              <Bot size={14} /> Pay with Pi Network
+          )}
+
+          {/* Grid of alternative standard web payments */}
+          <div className="grid grid-cols-2 gap-3">
+            <button onClick={() => setMethod('paystack')} className={`p-3 rounded-xl border flex flex-col items-center gap-1.5 font-black uppercase text-[9px] tracking-widest transition-all ${method === 'paystack' ? 'border-yellow-500 bg-yellow-50 text-yellow-700 shadow-sm' : 'border-gray-100 bg-slate-50 text-gray-500'}`}>
+              <CreditCard size={14} /> Paystack
+            </button>
+            <button onClick={() => setMethod('flutterwave')} className={`p-3 rounded-xl border flex flex-col items-center gap-1.5 font-black uppercase text-[9px] tracking-widest transition-all ${method === 'flutterwave' ? 'border-yellow-500 bg-yellow-50 text-yellow-700 shadow-sm' : 'border-gray-100 bg-slate-50 text-gray-500'}`}>
+              <CreditCard size={14} /> Flutterwave
+            </button>
+            <button onClick={() => setMethod('usdt')} className={`p-3 rounded-xl border flex flex-col items-center gap-1.5 font-black uppercase text-[9px] tracking-widest transition-all ${method === 'usdt' ? 'border-yellow-500 bg-yellow-50 text-yellow-700 shadow-sm' : 'border-gray-100 bg-slate-50 text-gray-500'}`}>
+              <SmartphoneNfc size={14} /> USDT BEP20
+            </button>
+            <button onClick={() => setMethod('usdc')} className={`p-3 rounded-xl border flex flex-col items-center gap-1.5 font-black uppercase text-[9px] tracking-widest transition-all ${method === 'usdc' ? 'border-yellow-500 bg-yellow-50 text-yellow-700 shadow-sm' : 'border-gray-100 bg-slate-50 text-gray-500'}`}>
+              <SmartphoneNfc size={14} /> USDC Base
             </button>
           </div>
-        )}
+        </div>
 
         {/* Manual Crypto Verification Interface */}
         {(method === 'usdt' || method === 'usdc') && (
