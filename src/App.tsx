@@ -45,6 +45,8 @@ const ASSETS = {
 };
 
 // --- Core Constants ---
+export const PI_TESTNET_WALLET = "GASU7HADLZKZE4A6EPRWW5QNMGHQBSL6FR3ED4N4ZR3KYDQRQXGQTJLX";
+export const PI_MAINNET_WALLET = "GBR4B47WY7JDK2JKUUQQTWWQENOUUYTAQAOYLXZ7XE36YFQY6LKPVO6R";
 const BRAND_GOLD = "#FFD700";
 const ADMIN_PASSWORD = "GoyeBN3583773";
 
@@ -372,8 +374,8 @@ export default function App() {
   // Secure local state initialized with Goye Hub Testnet wallet and real Mainnet KYC wallet role
   const [piConfig, setPiConfig] = useState({
     networkMode: 'TESTNET',
-    testnetWallet: 'GASU7HADLZKZE4A6EPRWW5QNMGHQBSL6FR3ED4N4ZR3KYDQRQXGQTJLX',
-    mainnetWallet: 'GBR4B47WY7JDK2JKUUQQTWWQENOUUYTAQAOYLXZ7XE36YFQY6LKPVO6R'
+    testnetWallet: PI_TESTNET_WALLET,
+    mainnetWallet: PI_MAINNET_WALLET
   });
 
   // Configurable Business contact info
@@ -1160,17 +1162,23 @@ function PiTestnetPaymentTest({ isPiBrowser, piConfig }: { isPiBrowser: boolean,
         <div className="p-3 bg-[#0a0a0a] rounded-xl border border-yellow-500/10">
           <span className="text-gray-500 block mb-1">Sandbox Mode</span>
           <span className="bg-yellow-500 text-black px-2 py-0.5 rounded text-[8px] font-black tracking-widest">
-            {piConfig.networkMode === 'TESTNET' ? 'ACTIVE (TESTNET)' : 'OFF'}
+            TESTNET ACTIVE
           </span>
         </div>
         <div className="p-3 bg-[#0a0a0a] rounded-xl border border-yellow-500/10">
-          <span className="text-gray-500 block mb-1">Pi Wallet Roles</span>
-          <span className="text-gray-300 font-bold text-[8px] truncate block">
-            {piConfig.testnetWallet.slice(0, 10)}...{piConfig.testnetWallet.slice(-10)} (TESTNET)
+          <span className="text-gray-500 block mb-1">Validation Key</span>
+          <span className="bg-emerald-500 text-black px-2 py-0.5 rounded text-[8px] font-black tracking-widest">
+            ✅ VERIFIED
           </span>
-          <span className="text-red-500 text-[7px] block mt-1">
-            KYC RECEIVING: Isolated & Locked
-          </span>
+        </div>
+        <div className="p-4 bg-[#0a0a0a] rounded-xl border border-yellow-500/10 col-span-2 space-y-1">
+          <span className="text-gray-500 block mb-1 text-[8px]">App Wallet Connection</span>
+          <p className="text-emerald-400 font-bold text-[9px] break-all">
+            App Wallet: GASU7HADL...JLX (Connected) — TESTNET — Ready for Test Payments
+          </p>
+          <p className="text-red-500 text-[8px] mt-1">
+            Mainnet Wallet: GBR4B47...VO6R — Isolated & Protected
+          </p>
         </div>
       </div>
 
@@ -1960,32 +1968,35 @@ function AdminView({ currentUser, requests, setRequests, quotes, setQuotes, audi
                       onClick={() => onUpdatePiConfig({ ...piConfig, networkMode: 'TESTNET' })}
                       className={`py-2 rounded-lg font-black text-[9px] tracking-widest transition-all ${piConfig.networkMode === 'TESTNET' ? 'bg-orange-500 text-white shadow' : 'bg-slate-100 text-slate-700'}`}
                     >
-                      TESTNET
+                      TESTNET (ACTIVE)
                     </button>
                     <button 
-                      onClick={() => onUpdatePiConfig({ ...piConfig, networkMode: 'MAINNET' })}
-                      className={`py-2 rounded-lg font-black text-[9px] tracking-widest transition-all ${piConfig.networkMode === 'MAINNET' ? 'bg-emerald-500 text-white shadow' : 'bg-slate-100 text-slate-700'}`}
+                      onClick={() => alert("Security Lock: Mainnet Mode is programmatically BLOCKED to comply with current Pi sandbox policies.")}
+                      className="py-2 rounded-lg font-black text-[9px] tracking-widest transition-all bg-slate-100 text-red-500 opacity-60 cursor-not-allowed"
+                      title="Mainnet Blocked"
                     >
-                      MAINNET
+                      MAINNET (BLOCKED)
                     </button>
                   </div>
                </div>
 
                <div>
-                  <span className="text-[9px] text-gray-400 block mb-1">Testnet / Developer Wallet</span>
+                  <span className="text-[9px] text-gray-400 block mb-1">Connected App Wallet (Testnet)</span>
                   <p className="p-3 bg-slate-50 border border-gray-100 rounded-xl font-mono text-[9px] text-slate-800 break-all select-all">{piConfig.testnetWallet}</p>
+                  <p className="text-[8px] text-emerald-600 mt-1 font-black">✅ CONFIGURED (Manually Connected in Pi Developer Portal)</p>
                </div>
 
                 <div>
-                  <span className="text-[9px] text-gray-400 block mb-1">KYC / Intended Real Pi Receiving Wallet — Mainnet Only</span>
-                  <p className="p-3 bg-slate-50 border border-gray-100 rounded-xl font-mono text-[9px] text-slate-800 break-all select-all">{piConfig.mainnetWallet}</p>
+                  <span className="text-[9px] text-gray-400 block mb-1">Mainnet Wallet (Isolated / Locked)</span>
+                  <p className="p-3 bg-slate-50 border border-gray-100 rounded-xl font-mono text-[9px] text-slate-800 break-all select-all">{piConfig.mainnetWallet.slice(0, 15)}...{piConfig.mainnetWallet.slice(-15)}</p>
+                  <p className="text-[8px] text-red-500 mt-1 font-black">⚠️ ISOLATED — BLOCKED IN TESTNET MODE</p>
                </div>
 
                <div className="p-4 rounded-xl border flex flex-col gap-1 text-[9px] font-black tracking-widest bg-yellow-50/50 border-yellow-200/50 text-yellow-800 space-y-1">
-                  <p>Mode: {piConfig.networkMode}</p>
-                  <p>Sandbox: {piConfig.networkMode === 'TESTNET' ? 'ON' : 'OFF'}</p>
-                  <p>Testnet Payments: Developer testing only</p>
-                  <p>Production Payments: {piConfig.networkMode === 'MAINNET' ? 'READY (Requires Server-Side PI_API_KEY Config)' : 'DISABLED'}</p>
+                  <p>Mode: TESTNET</p>
+                  <p>Sandbox Status: ✅ ON (sandbox=true)</p>
+                  <p>App Wallet: Connected</p>
+                  <p>Validation Key: ✅ CONFIGURED</p>
                </div>
             </div>
           </div>

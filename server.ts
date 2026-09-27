@@ -17,6 +17,9 @@ const FLUTTERWAVE_PUBLIC_KEY = process.env.FLUTTERWAVE_PUBLIC_KEY || "";
 const FLUTTERWAVE_SECRET_KEY = process.env.FLUTTERWAVE_SECRET_KEY || "";
 const PI_API_KEY = process.env.PI_API_KEY || "";
 
+export const PI_TESTNET_WALLET = "GASU7HADLZKZE4A6EPRWW5QNMGHQBSL6FR3ED4N4ZR3KYDQRQXGQTJLX";
+export const PI_MAINNET_WALLET = "GBR4B47WY7JDK2JKUUQQTWWQENOUUYTAQAOYLXZ7XE36YFQY6LKPVO6R";
+
 async function createServer() {
   const app = express();
   app.use(cors());
@@ -133,8 +136,16 @@ async function createServer() {
       VITE_FLUTTERWAVE_PUBLIC_KEY: process.env.VITE_FLUTTERWAVE_PUBLIC_KEY ? 'CONFIGURED' : 'NOT CONFIGURED',
       PI_NETWORK_MODE: 'TESTNET',
       PI_SANDBOX: true,
-      TESTNET_WALLET: 'GASU7...JLX',
+      TESTNET_WALLET: PI_TESTNET_WALLET,
       VALIDATION_KEY: 'CONFIGURED',
+      appWallet: {
+        testnet: PI_TESTNET_WALLET,
+        testnetStatus: "CONFIGURED",
+        mainnet: PI_MAINNET_WALLET,
+        mainnetStatus: "KYC / Mainnet Only - BLOCKED IN TESTNET",
+        networkMode: "TESTNET",
+        sandbox: true
+      },
       paymentGateways: {
         paystack_secret: PAYSTACK_SECRET_KEY ? 'CONFIGURED' : 'NOT CONFIGURED',
         flutterwave_secret: FLUTTERWAVE_SECRET_KEY ? 'CONFIGURED' : 'NOT CONFIGURED',
