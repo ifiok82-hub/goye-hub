@@ -49,7 +49,7 @@ const BRAND_GOLD = "#FFD700";
 const ADMIN_PASSWORD = "GoyeBN3583773";
 
 // --- Types ---
-type Section = 'home' | 'services' | 'dashboard' | 'admin' | 'faq' | 'about' | 'contact' | 'legal';
+type Section = 'home' | 'services' | 'dashboard' | 'admin' | 'faq' | 'about' | 'contact' | 'legal' | 'privacy-policy';
 type ServiceType = 'CAC' | 'WEB' | 'AI' | 'DIG';
 
 interface Service {
@@ -329,7 +329,24 @@ const SERVICES_CATALOG: Service[] = [
 ];
 
 export default function App() {
-  const [activeSection, setActiveSection] = useState<Section>('home');
+  const [activeSection, setActiveSection] = useState<Section>(() => {
+    if (typeof window !== 'undefined') {
+      if (window.location.pathname === '/privacy-policy') {
+        return 'privacy-policy';
+      }
+    }
+    return 'home';
+  });
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      if (activeSection === 'privacy-policy') {
+        window.history.pushState(null, '', '/privacy-policy');
+      } else if (activeSection === 'home') {
+        window.history.pushState(null, '', '/');
+      }
+    }
+  }, [activeSection]);
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [activeCategoryFilter, setActiveCategoryFilter] = useState<string>('ALL');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -719,6 +736,7 @@ export default function App() {
         {activeSection === 'about' && <AboutView />}
         {activeSection === 'contact' && <ContactView config={config} />}
         {activeSection === 'legal' && <LegalView />}
+        {activeSection === 'privacy-policy' && <PrivacyPolicyView />}
       </main>
 
       {/* Checkout Modal */}
@@ -822,7 +840,7 @@ export default function App() {
             <ul className="space-y-3 text-xs text-gray-400 uppercase tracking-widest font-bold">
               <li className="hover:text-yellow-500 cursor-pointer" onClick={() => setActiveSection('faq')}>FAQ & Pricing</li>
               <li className="hover:text-yellow-500 cursor-pointer" onClick={() => setActiveSection('legal')}>Terms of Service</li>
-              <li className="hover:text-yellow-500 cursor-pointer" onClick={() => setActiveSection('legal')}>Privacy Policy</li>
+              <li className="hover:text-yellow-500 cursor-pointer" onClick={() => setActiveSection('privacy-policy')}>Privacy Policy</li>
             </ul>
           </div>
         </div>
@@ -2174,6 +2192,99 @@ function LegalView() {
             <h3 className="text-yellow-500 font-black mb-2">3. Refund Policy</h3>
             <p>Refund requests are subject to audit review. Government processing fees and completed service milestones are non-refundable once initiated under third-party systems.</p>
          </div>
+      </div>
+    </div>
+  );
+}
+
+// --- Privacy Policy View Component ---
+function PrivacyPolicyView() {
+  return (
+    <div className="bg-[#000000] text-[#FFD700] min-h-screen py-16 px-6 font-sans border-t border-yellow-500/20">
+      <div className="max-w-4xl mx-auto space-y-12 bg-[#0a0a0a] border border-yellow-500/20 p-8 md:p-12 rounded-3xl shadow-2xl">
+        <div className="border-b border-yellow-500/20 pb-8 text-center md:text-left">
+          <span className="bg-yellow-500/10 text-[#FFD700] px-3 py-1 rounded text-[9px] font-black uppercase tracking-widest border border-yellow-500/20 mb-4 inline-block">Official Policy Document</span>
+          <h1 className="text-3xl md:text-5xl font-black uppercase tracking-tighter text-[#FFD700] mb-2">PRIVACY POLICY</h1>
+          <p className="text-gray-400 text-xs font-bold uppercase tracking-widest">Effective Date: September 27, 2026</p>
+        </div>
+
+        <div className="space-y-8 text-xs md:text-sm font-bold uppercase tracking-wider leading-relaxed text-gray-300">
+          <div>
+            <h3 className="text-base font-black text-[#FFD700] mb-3 tracking-widest uppercase">1. OVERVIEW</h3>
+            <p className="text-gray-400 text-xs uppercase tracking-widest font-black leading-relaxed">
+              At <span className="text-[#FFD700]">GOYE SERVICES HUB</span> (accessible via <a href="https://goye-hub.vercel.app" className="underline text-yellow-400">https://goye-hub.vercel.app</a>), protecting our client data and privacy is paramount. This Privacy Policy details the data collected, its utilization, and how we safeguard user integrity across our integrated Corporate Affairs Commission (CAC) setup systems, website developments, and AI assistance solutions.
+            </p>
+          </div>
+
+          <div>
+            <h3 className="text-base font-black text-[#FFD700] mb-3 tracking-widest uppercase">2. INFORMATION WE COLLECT</h3>
+            <p className="text-gray-400 text-xs uppercase tracking-widest font-black leading-relaxed mb-4">
+              To process your service requests securely, we collect the following customer identification data:
+            </p>
+            <ul className="list-disc list-inside space-y-2 pl-4 text-xs tracking-widest text-gray-400 uppercase">
+              <li>Applicant Full Name / Username</li>
+              <li>Official Email Address</li>
+              <li>Phone & WhatsApp Contact Number</li>
+              <li>Specific business filings / Proposed business names</li>
+              <li>Secure transactional checkout references (e.g. Tx hash, gateway transaction logs)</li>
+            </ul>
+          </div>
+
+          <div>
+            <h3 className="text-base font-black text-[#FFD700] mb-3 tracking-widest uppercase">3. HOW WE USE YOUR DATA</h3>
+            <p className="text-gray-400 text-xs uppercase tracking-widest font-black leading-relaxed mb-4">
+              Your registered information is used strictly to fulfill the professional agency services requested by you:
+            </p>
+            <ul className="list-disc list-inside space-y-2 pl-4 text-xs tracking-widest text-gray-400 uppercase">
+              <li>Filing Corporate Affairs Commission (CAC) LLC and business registrations.</li>
+              <li>Designing, hosting, and deploying custom React web applications.</li>
+              <li>Training, calibrating, and integrating custom conversational WhatsApp AI bots.</li>
+              <li>Direct customer communications, issuing invoice quotes, and support tickets resolution.</li>
+            </ul>
+          </div>
+
+          <div>
+            <h3 className="text-base font-black text-[#FFD700] mb-3 tracking-widest uppercase">4. PI NETWORK & SDK INTEGRATION</h3>
+            <p className="text-gray-400 text-xs uppercase tracking-widest font-black leading-relaxed">
+              For payments processed via the Pi Network blockchain, we utilize the official Pi Browser SDK environment. We collect your authenticated Pi username and public wallet address for real-time validation via our backend API. 
+              <br />
+              <span className="text-yellow-500 font-black">CRITICAL SECURITY CLAUSE: We never ask for, access, or store your Pi Passphrase, private keys, or wallet seed.</span> All transactions are signed securely client-side within the isolated official Pi Browser container.
+            </p>
+          </div>
+
+          <div>
+            <h3 className="text-base font-black text-[#FFD700] mb-3 tracking-widest uppercase">5. PAYMENTS & FINANCIAL SECURITY</h3>
+            <p className="text-gray-400 text-xs uppercase tracking-widest font-black leading-relaxed">
+              We process payments via secure, industry-leading gateways: Paystack, Flutterwave, USDT (BEP20), USDC (Base Network), and the Pi Network. We do NOT capture, store, or log any credit card numbers, CVVs, or bank credentials. All financial authorizations are processed directly by our external PCI-compliant payment processors.
+            </p>
+          </div>
+
+          <div>
+            <h3 className="text-base font-black text-[#FFD700] mb-3 tracking-widest uppercase">6. DATA SHARING & THIRD-PARTY AGENTS</h3>
+            <p className="text-gray-400 text-xs uppercase tracking-widest font-black leading-relaxed">
+              We do NOT sell, rent, or trade your personal identification data. We share relevant data strictly with verified government authorities (Corporate Affairs Commission) for registration, PCI-compliant payment gateways to authorize checkouts, and the Pi Platform API for token verification loops.
+            </p>
+          </div>
+
+          <div>
+            <h3 className="text-base font-black text-[#FFD700] mb-3 tracking-widest uppercase">7. SESSION STORAGE & LOCAL STORAGE</h3>
+            <p className="text-gray-400 text-xs uppercase tracking-widest font-black leading-relaxed">
+              We utilize secure client-side browser <span className="text-[#FFD700]">localStorage</span> to retain active user login profiles, support tickets, and request states between browser refreshes. No persistent tracking cookies are deployed.
+            </p>
+          </div>
+
+          <div>
+            <h3 className="text-base font-black text-[#FFD700] mb-3 tracking-widest uppercase">8. YOUR RIGHTS & DATA DELETION</h3>
+            <p className="text-gray-400 text-xs uppercase tracking-widest font-black leading-relaxed">
+              You maintain full ownership of your data. You may request the absolute deletion of your registered records, requests, and documents at any time by contacting our support team at <a href="mailto:goyedagosmessenterprise@gmail.com" className="underline text-yellow-400">goyedagosmessenterprise@gmail.com</a>. We will process your deletion request within 48 business hours.
+            </p>
+          </div>
+        </div>
+
+        <div className="border-t border-yellow-500/20 pt-8 flex flex-col md:flex-row justify-between items-center text-[10px] text-gray-500 font-bold uppercase tracking-widest gap-4">
+          <p>© 2026 GOYE SERVICES HUB. ALL RIGHTS RESERVED.</p>
+          <p>Contact: goyedagosmessenterprise@gmail.com</p>
+        </div>
       </div>
     </div>
   );
