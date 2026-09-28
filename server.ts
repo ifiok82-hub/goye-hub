@@ -43,6 +43,28 @@ function writeProfiles(profiles: any) {
   }
 }
 
+const ORDERS_FILE = path.join(__dirname, 'orders_db.json');
+
+function readOrdersDB() {
+  try {
+    if (fs.existsSync(ORDERS_FILE)) {
+      const data = fs.readFileSync(ORDERS_FILE, 'utf-8');
+      return JSON.parse(data);
+    }
+  } catch (e) {
+    console.error('[Orders DB] Error reading file:', e);
+  }
+  return { requests: [], quotes: [] };
+}
+
+function writeOrdersDB(db: any) {
+  try {
+    fs.writeFileSync(ORDERS_FILE, JSON.stringify(db, null, 2), 'utf-8');
+  } catch (e) {
+    console.error('[Orders DB] Error writing file:', e);
+  }
+}
+
 // Clean credentials placeholders in compliance with security guidelines
 const PAYSTACK_PUBLIC_KEY = process.env.PAYSTACK_PUBLIC_KEY || "";
 const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY || "";
@@ -100,7 +122,7 @@ async function createServer() {
 
   // Server-Side Pi Payment Completion
   app.post('/api/pi/complete', async (req, res) => {
-    const { paymentId, txid } = req.body;
+    const { paymentId, txid, orderId } = req.body;
     try {
       if (!PI_API_KEY) {
         return res.status(500).json({ status: false, message: 'PI_API_KEY is not configured on the server-side.' });
@@ -111,6 +133,21 @@ async function createServer() {
           Authorization: `Key ${PI_API_KEY}`
         }
       });
+
+      // Update the request status securely if orderId is provided
+      if (orderId) {
+        const db = readOrdersDB();
+        db.requests = db.requests || [];
+        const idx = db.requests.findIndex((r: any) => r.id === orderId);
+        if (idx >= 0) {
+          db.requests[idx].status = 'PAYMENT VERIFIED';
+          db.requests[idx].paymentRef = txid;
+          db.requests[idx].paymentProvider = 'PI_NETWORK';
+          db.requests[idx].updatedAt = Date.now();
+          writeOrdersDB(db);
+        }
+      }
+
       res.json({ status: 'success', message: 'Pi Blockchain Transaction Verified & Completed Server-Side', data: response.data });
     } catch (error: any) {
       console.error("Pi Complete Error: ", error.response?.data || error.message);
@@ -289,6 +326,287 @@ async function createServer() {
     } catch (err: any) {
       return res.status(401).json({ error: 'Invalid or expired admin token.' });
     }
+  });
+
+  // Secure endpoints to manage service requests and acceptances
+  app.get('/api/orders', (req, res) => {
+    const userId = req.query.userId as string;
+    const authHeader = req.headers.authorization;
+    
+    let isAdmin = false;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.split(' ')[1];
+      try {
+        const decoded = jwt.verify(token, ADMIN_JWT_SECRET) as any;
+        if (decoded && decoded.role === 'admin') {
+          isAdmin = true;
+        }
+      } catch (err) {}
+    }
+
+    const db = readOrdersDB();
+
+    if (isAdmin) {
+      return res.json({ requests: db.requests || [], quotes: db.quotes || [] });
+    }
+
+    if (!userId) {
+      return res.status(400).json({ error: 'Missing userId parameter' });
+    }
+
+    // Customer Isolation: Filter strictly by userId
+    const userRequests = (db.requests || []).filter((r: any) => r.userId === userId);
+    const userQuotes = (db.quotes || []).filter((q: any) => {
+      const associatedReq = (db.requests || []).find((r: any) => r.id === q.requestId);
+      return associatedReq && associatedReq.userId === userId;
+    });
+
+    res.json({ requests: userRequests, quotes: userQuotes });
+  });
+
+  app.post('/api/orders/create', (req, res) => {
+    const { request } = req.body;
+    if (!request || !request.id || !request.userId) {
+      return res.status(400).json({ error: 'Invalid order structure' });
+    }
+
+    const db = readOrdersDB();
+    db.requests = db.requests || [];
+
+    // Enforce that new orders must always start in unpaid state
+    const cleanRequest = {
+      ...request,
+      status: request.status === 'PAYMENT VERIFIED' || request.status === 'COMPLETED' ? 'PAYMENT PENDING' : (request.status || 'PAYMENT PENDING'),
+      paymentRef: undefined,
+      paymentProvider: undefined,
+      updatedAt: Date.now()
+    };
+
+    const existingIdx = db.requests.findIndex((r: any) => r.id === request.id);
+    if (existingIdx >= 0) {
+      const existing = db.requests[existingIdx];
+      // Do not overwrite validated payment status unless verified securely!
+      if (existing.status === 'PAYMENT VERIFIED' || existing.status === 'COMPLETED') {
+        cleanRequest.status = existing.status;
+        cleanRequest.paymentRef = existing.paymentRef;
+        cleanRequest.paymentProvider = existing.paymentProvider;
+      }
+      db.requests[existingIdx] = cleanRequest;
+    } else {
+      db.requests.push(cleanRequest);
+    }
+
+    writeOrdersDB(db);
+    res.json({ success: true, request: cleanRequest });
+  });
+
+  app.post('/api/quotes/create', (req, res) => {
+    const { quote } = req.body;
+    if (!quote || !quote.id) {
+      return res.status(400).json({ error: 'Invalid quote structure' });
+    }
+
+    const db = readOrdersDB();
+    db.quotes = db.quotes || [];
+
+    const existingIdx = db.quotes.findIndex((q: any) => q.id === quote.id);
+    if (existingIdx >= 0) {
+      db.quotes[existingIdx] = { ...db.quotes[existingIdx], ...quote };
+    } else {
+      db.quotes.push(quote);
+    }
+
+    writeOrdersDB(db);
+    res.json({ success: true, quote });
+  });
+
+  app.post('/api/admin/orders/update-status', (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Access denied. Missing bearer token.' });
+    }
+
+    const token = authHeader.split(' ')[1];
+    try {
+      const decoded = jwt.verify(token, ADMIN_JWT_SECRET) as any;
+      if (!decoded || decoded.role !== 'admin') {
+        return res.status(401).json({ error: 'Unauthorized role.' });
+      }
+    } catch (err) {
+      return res.status(401).json({ error: 'Invalid admin token.' });
+    }
+
+    const { id, type, status, verifierInfo } = req.body;
+    if (!id || !status) {
+      return res.status(400).json({ error: 'Missing id or status' });
+    }
+
+    const db = readOrdersDB();
+
+    if (type === 'QUOTE') {
+      db.quotes = db.quotes || [];
+      const idx = db.quotes.findIndex((q: any) => q.id === id);
+      if (idx >= 0) {
+        db.quotes[idx].status = status;
+        db.quotes[idx].updatedAt = Date.now();
+        writeOrdersDB(db);
+        return res.json({ success: true, quote: db.quotes[idx] });
+      }
+    } else {
+      db.requests = db.requests || [];
+      const idx = db.requests.findIndex((r: any) => r.id === id);
+      if (idx >= 0) {
+        db.requests[idx].status = status;
+        db.requests[idx].updatedAt = Date.now();
+        if (status === 'PAYMENT VERIFIED') {
+          db.requests[idx].verifiedByAdmin = verifierInfo || 'Admin';
+          db.requests[idx].verifiedAt = Date.now();
+        }
+        writeOrdersDB(db);
+        return res.json({ success: true, request: db.requests[idx] });
+      }
+    }
+
+    res.status(404).json({ error: 'Record not found' });
+  });
+
+  app.post('/api/payments/paystack/verify', async (req, res) => {
+    const { orderId, reference, expectedAmount } = req.body;
+    if (!orderId || !reference || !expectedAmount) {
+      return res.status(400).json({ error: 'Missing required validation parameters' });
+    }
+
+    if (!PAYSTACK_SECRET_KEY) {
+      return res.status(500).json({ error: 'Paystack configuration error. Secret Key missing.' });
+    }
+
+    const db = readOrdersDB();
+    db.requests = db.requests || [];
+    
+    // Verify reference uniqueness to prevent transaction reuse
+    const alreadyUsed = db.requests.some((r: any) => r.paymentRef === reference && r.id !== orderId && r.status === 'PAYMENT VERIFIED');
+    if (alreadyUsed) {
+      return res.status(400).json({ error: 'Transaction reference has already been used for another order.' });
+    }
+
+    try {
+      const apiResponse = await axios.get(`https://api.paystack.co/transaction/verify/${reference}`, {
+        headers: {
+          Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`
+        }
+      });
+
+      const data = apiResponse.data?.data;
+      if (apiResponse.data?.status && data?.status === 'success') {
+        const receivedAmountInKobo = data.amount;
+        const expectedAmountInKobo = expectedAmount * 100;
+
+        if (receivedAmountInKobo < expectedAmountInKobo) {
+          return res.status(400).json({ error: `Amount mismatch. Expected ₦${expectedAmount}, received ₦${receivedAmountInKobo / 100}` });
+        }
+
+        if (data.currency !== 'NGN') {
+          return res.status(400).json({ error: `Currency mismatch. Expected NGN, received ${data.currency}` });
+        }
+
+        const idx = db.requests.findIndex((r: any) => r.id === orderId);
+        if (idx >= 0) {
+          db.requests[idx].status = 'PAYMENT VERIFIED';
+          db.requests[idx].paymentRef = reference;
+          db.requests[idx].paymentProvider = 'PAYSTACK';
+          db.requests[idx].updatedAt = Date.now();
+          writeOrdersDB(db);
+          return res.json({ success: true, request: db.requests[idx] });
+        } else {
+          return res.status(404).json({ error: 'Order not found to associate with payment.' });
+        }
+      } else {
+        return res.status(400).json({ error: 'Transaction is not in a successful state on Paystack.' });
+      }
+    } catch (err: any) {
+      console.error("Paystack API Error:", err.response?.data || err.message);
+      return res.status(500).json({ error: `Paystack API Verification Failed: ${err.response?.data?.message || err.message}` });
+    }
+  });
+
+  app.post('/api/payments/flutterwave/verify', async (req, res) => {
+    const { orderId, reference, expectedAmount, transactionId } = req.body;
+    if (!orderId || !expectedAmount || (!reference && !transactionId)) {
+      return res.status(400).json({ error: 'Missing required validation parameters' });
+    }
+
+    if (!FLUTTERWAVE_SECRET_KEY) {
+      return res.status(500).json({ error: 'Flutterwave configuration error. Secret Key missing.' });
+    }
+
+    const db = readOrdersDB();
+    db.requests = db.requests || [];
+
+    const lookupRef = reference || transactionId;
+    const alreadyUsed = db.requests.some((r: any) => r.paymentRef === lookupRef && r.id !== orderId && r.status === 'PAYMENT VERIFIED');
+    if (alreadyUsed) {
+      return res.status(400).json({ error: 'Transaction reference has already been used for another order.' });
+    }
+
+    try {
+      const apiResponse = await axios.get(`https://api.flutterwave.com/v3/transactions/${transactionId}/verify`, {
+        headers: {
+          Authorization: `Bearer ${FLUTTERWAVE_SECRET_KEY}`
+        }
+      });
+
+      const data = apiResponse.data?.data;
+      if (apiResponse.data?.status === 'success' && data?.status === 'successful') {
+        const receivedAmount = data.amount;
+        if (receivedAmount < expectedAmount) {
+          return res.status(400).json({ error: `Amount mismatch. Expected ₦${expectedAmount}, received ₦${receivedAmount}` });
+        }
+
+        if (data.currency !== 'NGN') {
+          return res.status(400).json({ error: `Currency mismatch. Expected NGN, received ${data.currency}` });
+        }
+
+        const idx = db.requests.findIndex((r: any) => r.id === orderId);
+        if (idx >= 0) {
+          db.requests[idx].status = 'PAYMENT VERIFIED';
+          db.requests[idx].paymentRef = lookupRef;
+          db.requests[idx].paymentProvider = 'FLUTTERWAVE';
+          db.requests[idx].updatedAt = Date.now();
+          writeOrdersDB(db);
+          return res.json({ success: true, request: db.requests[idx] });
+        } else {
+          return res.status(404).json({ error: 'Order not found to associate with payment.' });
+        }
+      } else {
+        return res.status(400).json({ error: 'Transaction is not successful on Flutterwave.' });
+      }
+    } catch (err: any) {
+      console.error("Flutterwave API Error:", err.response?.data || err.message);
+      return res.status(500).json({ error: `Flutterwave API Verification Failed: ${err.response?.data?.message || err.message}` });
+    }
+  });
+
+  app.post('/api/payments/crypto/submit', (req, res) => {
+    const { orderId, txHash, provider } = req.body;
+    if (!orderId || !txHash || !provider) {
+      return res.status(400).json({ error: 'Missing payment metadata' });
+    }
+
+    const db = readOrdersDB();
+    db.requests = db.requests || [];
+    
+    const idx = db.requests.findIndex((r: any) => r.id === orderId);
+    if (idx >= 0) {
+      // Must strictly remain PAYMENT PENDING until manual administrator verification
+      db.requests[idx].status = 'PAYMENT PENDING';
+      db.requests[idx].paymentRef = txHash;
+      db.requests[idx].paymentProvider = provider;
+      db.requests[idx].updatedAt = Date.now();
+      writeOrdersDB(db);
+      return res.json({ success: true, request: db.requests[idx] });
+    }
+
+    res.status(404).json({ error: 'Order not found' });
   });
 
   // --- Vite Integration / Static Serving ---

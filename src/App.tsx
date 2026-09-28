@@ -525,8 +525,65 @@ export default function App() {
         .catch(err => {
           console.warn("[Profile Sync] Error syncing user profile with backend:", err);
         });
+
+      // Synchronize orders and quotes from secure backend database
+      const headers: any = {};
+      const savedAdminToken = localStorage.getItem('goye_admin_token');
+      if (savedAdminToken && currentUser.role === 'admin') {
+        headers['Authorization'] = `Bearer ${savedAdminToken}`;
+      }
+
+      // Synchronize and sanitize local orders with server
+      const localReqsStr = localStorage.getItem('goye_requests_v2');
+      if (localReqsStr) {
+        try {
+          const localReqs = JSON.parse(localReqsStr) as ServiceRequest[];
+          Promise.all(
+            localReqs.map(req => {
+              if (req.userId === currentUser.id) {
+                return fetch('/api/orders/create', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ request: req })
+                }).catch(() => null);
+              }
+              return Promise.resolve(null);
+            })
+          ).then(() => {
+            // After uploading and sanitizing, pull the authoritative server-side list
+            fetch(`/api/orders?userId=${currentUser.id}`, { headers })
+              .then(res => res.ok ? res.json() : null)
+              .then(data => {
+                if (data) {
+                  setRequests(data.requests || []);
+                  setQuotes(data.quotes || []);
+                  saveState('goye_requests_v2', data.requests || []);
+                  saveState('goye_quotes_v2', data.quotes || []);
+                }
+              })
+              .catch(err => {
+                console.warn("[Orders Sync] Error synchronizing orders from backend server:", err);
+              });
+          });
+        } catch (e) {}
+      } else {
+        // Fallback if no local requests, just pull directly
+        fetch(`/api/orders?userId=${currentUser.id}`, { headers })
+          .then(res => res.ok ? res.json() : null)
+          .then(data => {
+            if (data) {
+              setRequests(data.requests || []);
+              setQuotes(data.quotes || []);
+              saveState('goye_requests_v2', data.requests || []);
+              saveState('goye_quotes_v2', data.quotes || []);
+            }
+          })
+          .catch(err => {
+            console.warn("[Orders Sync] Error synchronizing orders from backend server:", err);
+          });
+      }
     }
-  }, [currentUser?.id]);
+  }, [currentUser?.id, activeSection]);
 
   // Save changes to localStorage helper
   const saveState = (key: string, data: any) => {
@@ -600,14 +657,33 @@ export default function App() {
       serviceId: service.id,
       serviceName: service.name,
       type: service.type,
-      status: 'SUBMITTED',
+      status: 'PAYMENT PENDING',
       formData,
       createdAt: Date.now(),
       amount: service.price + (service.govtFee || 0)
     };
-    const updated = [newReq, ...requests];
-    setRequests(updated);
-    saveState('goye_requests_v2', updated);
+
+    try {
+      const res = await fetch('/api/orders/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ request: newReq })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const updated = [data.request, ...requests.filter(r => r.id !== data.request.id)];
+        setRequests(updated);
+        saveState('goye_requests_v2', updated);
+      } else {
+        throw new Error("Server rejected order creation");
+      }
+    } catch (err) {
+      console.warn("Fell back to local state sync due to backend sync latency", err);
+      const updated = [newReq, ...requests];
+      setRequests(updated);
+      saveState('goye_requests_v2', updated);
+    }
+
     logAction(currentUser.name, 'Submitted Service Request', newReq.id);
     setSelectedService(null);
     setActiveSection('dashboard');
@@ -645,6 +721,27 @@ export default function App() {
       isCrypto ? `Submitted ${provider} Tx Hash for verification` : 'Completed Payment Verification', 
       activeCheckout.id
     );
+
+    // Force synchronize with server order database to guarantee status integrity
+    if (currentUser) {
+      const savedAdminToken = localStorage.getItem('goye_admin_token');
+      const headers: any = {};
+      if (savedAdminToken && currentUser.role === 'admin') {
+        headers['Authorization'] = `Bearer ${savedAdminToken}`;
+      }
+      fetch(`/api/orders?userId=${currentUser.id}`, { headers })
+        .then(res => res.ok ? res.json() : null)
+        .then(data => {
+          if (data) {
+            setRequests(data.requests || []);
+            setQuotes(data.quotes || []);
+            saveState('goye_requests_v2', data.requests || []);
+            saveState('goye_quotes_v2', data.quotes || []);
+          }
+        })
+        .catch(err => console.warn("Sync error post payment completion:", err));
+    }
+
     setActiveCheckout(null);
     setActiveSection('dashboard');
   };
@@ -884,6 +981,7 @@ export default function App() {
             onClose={() => setActiveCheckout(null)} 
             onComplete={handlePaymentComplete} 
             piConfig={piConfig}
+            currentUser={currentUser}
           />
         )}
       </AnimatePresence>
@@ -2056,13 +2154,36 @@ function AdminView({ currentUser, requests, setRequests, quotes, setQuotes, audi
     return <div className="text-center py-24 text-red-500 uppercase font-black tracking-widest">Access Restricted to Administrators</div>;
   }
 
-  const handleUpdateStatus = (id: string, status: ServiceRequest['status']) => {
-    const updated = requests.map(r => r.id === id ? { ...r, status } : r);
-    setRequests(updated);
-    localStorage.setItem('goye_requests_v2', JSON.stringify(updated));
+  const handleUpdateStatus = async (id: string, status: ServiceRequest['status']) => {
+    try {
+      const res = await fetch('/api/admin/orders/update-status', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${adminToken}`
+        },
+        body: JSON.stringify({
+          id,
+          type: 'REQUEST',
+          status,
+          verifierInfo: currentUser?.name || 'Admin'
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const updated = requests.map(r => r.id === id ? data.request : r);
+        setRequests(updated);
+        localStorage.setItem('goye_requests_v2', JSON.stringify(updated));
+      } else {
+        const errData = await res.json();
+        alert(`Failed to update status on server: ${errData.error}`);
+      }
+    } catch (e: any) {
+      alert(`Network error updating status: ${e.message}`);
+    }
   };
 
-  const handleCreateQuote = (e: React.FormEvent) => {
+  const handleCreateQuote = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedReq) return;
     const newQuote: Quote = {
@@ -2079,16 +2200,31 @@ function AdminView({ currentUser, requests, setRequests, quotes, setQuotes, audi
       expiresAt: Date.now() + 7 * 24 * 60 * 60 * 1000,
       notes: quoteNotes
     };
-    const updated = [newQuote, ...quotes];
-    setQuotes(updated);
-    localStorage.setItem('goye_quotes_v2', JSON.stringify(updated));
 
-    // Update Request status to QUOTE READY
-    handleUpdateStatus(selectedReq.id, 'QUOTE READY');
-    setSelectedReq(null);
-    setQuoteAmount(0);
-    setQuoteNotes('');
-    alert("Quote successfully sent to customer.");
+    try {
+      const res = await fetch('/api/quotes/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ quote: newQuote })
+      });
+      if (res.ok) {
+        const updated = [newQuote, ...quotes];
+        setQuotes(updated);
+        localStorage.setItem('goye_quotes_v2', JSON.stringify(updated));
+
+        // Update Request status to QUOTE READY
+        await handleUpdateStatus(selectedReq.id, 'QUOTE READY');
+        setSelectedReq(null);
+        setQuoteAmount(0);
+        setQuoteNotes('');
+        alert("Quote successfully sent to customer.");
+      } else {
+        const errData = await res.json();
+        alert(`Failed to create quote on server: ${errData.error}`);
+      }
+    } catch (e: any) {
+      alert(`Network error sending quote: ${e.message}`);
+    }
   };
 
   return (
@@ -2431,7 +2567,7 @@ function AdminLoginScreen({ onLogin }: { onLogin: (password: string) => Promise<
 }
 
 // --- Checkout View ---
-function CheckoutModal({ item, isPiBrowser, onClose, onComplete, piConfig }: { item: ServiceRequest | Quote, isPiBrowser: boolean, onClose: () => void, onComplete: (ref: string, provider: string) => void, piConfig: any }) {
+function CheckoutModal({ item, isPiBrowser, onClose, onComplete, piConfig, currentUser }: { item: ServiceRequest | Quote, isPiBrowser: boolean, onClose: () => void, onComplete: (ref: string, provider: string) => void, piConfig: any, currentUser: UserProfile | null }) {
   const [method, setMethod] = useState<'paystack' | 'flutterwave' | 'usdt' | 'usdc' | 'pi'>(isPiBrowser ? 'pi' : 'paystack');
   const [isVerifying, setIsVerifying] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
@@ -2450,6 +2586,8 @@ function CheckoutModal({ item, isPiBrowser, onClose, onComplete, piConfig }: { i
 
   const price = 'amount' in item ? item.amount : item.total;
   const piAmount = Number((price / 1000).toFixed(2));
+  const isQuote = 'quoteNumber' in item;
+  const refNo = isQuote ? (item as Quote).quoteNumber : (item as ServiceRequest).requestNumber;
 
   // If no methods are available, show clear fallback message
   const availableMethods = ['paystack', 'flutterwave', 'usdt', 'usdc', 'pi'];
@@ -2476,7 +2614,17 @@ function CheckoutModal({ item, isPiBrowser, onClose, onComplete, piConfig }: { i
     usdc: Number((price / 1600).toFixed(2))  // Approx 1,600 NGN = 1 USDC
   };
 
-  const handleCheckout = () => {
+  const loadScript = (src: string): Promise<boolean> => {
+    return new Promise((resolve) => {
+      const script = document.createElement('script');
+      script.src = src;
+      script.onload = () => resolve(true);
+      script.onerror = () => resolve(false);
+      document.body.appendChild(script);
+    });
+  };
+
+  const handleCheckout = async () => {
     if (method === 'pi' && isMainnetBlocked) {
       setPaymentError("Mainnet payments are disabled until official server-side credentials and Mainnet Portal permissions are active.");
       return;
@@ -2521,7 +2669,7 @@ function CheckoutModal({ item, isPiBrowser, onClose, onComplete, piConfig }: { i
                   const res = await fetch('/api/pi/complete', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ paymentId, txid })
+                    body: JSON.stringify({ paymentId, txid, orderId: item.id })
                   });
                   const data = await res.json();
                   if (data.status === 'success') {
@@ -2555,21 +2703,147 @@ function CheckoutModal({ item, isPiBrowser, onClose, onComplete, piConfig }: { i
         setIsVerifying(false);
       }
     } else if (method === 'usdt' || method === 'usdc') {
-      // Manual crypto confirmation route
-      setTimeout(() => {
+      // Secure manual blockchain reference submission
+      try {
+        const res = await fetch('/api/payments/crypto/submit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            orderId: item.id,
+            txHash: txHash.trim(),
+            provider: method === 'usdt' ? 'USDT_BEP20' : 'USDC_BASE'
+          })
+        });
+        if (res.ok) {
+          setIsVerifying(false);
+          onComplete(txHash.trim(), method === 'usdt' ? 'USDT_BEP20' : 'USDC_BASE');
+          alert("Cryptocurrency transaction hash submitted to administrators. Payment will remain PENDING until verified manually.");
+        } else {
+          const errData = await res.json();
+          setPaymentError(errData.error || "Failed to log crypto payment reference on server.");
+          setIsVerifying(false);
+        }
+      } catch (err: any) {
+        setPaymentError("Network error submitting crypto transaction reference.");
         setIsVerifying(false);
-        onComplete(txHash, method === 'usdt' ? 'USDT_BEP20' : 'USDC_BASE');
-      }, 1500);
+      }
     } else if (method === 'paystack') {
-      setTimeout(() => {
+      const pubKey = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY;
+      if (!pubKey) {
+        setPaymentError("Paystack payment checkout is not currently configured by the system owner. Please select another payment method.");
         setIsVerifying(false);
-        onComplete(`TX-PAYSTACK-${Math.floor(100000 + Math.random() * 900000)}`, 'PAYSTACK');
-      }, 2000);
+        return;
+      }
+
+      const loaded = await loadScript('https://js.paystack.co/v1/inline.js');
+      if (!loaded) {
+        setPaymentError("Failed to initialize Paystack library.");
+        setIsVerifying(false);
+        return;
+      }
+
+      try {
+        const handler = (window as any).PaystackPop.setup({
+          key: pubKey,
+          email: currentUser?.email || 'customer@goyeservices.com',
+          amount: price * 100, // Paystack amount in kobo
+          ref: refNo,
+          currency: 'NGN',
+          callback: async (response: any) => {
+            try {
+              const verifyRes = await fetch('/api/payments/paystack/verify', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  orderId: item.id,
+                  reference: response.reference,
+                  expectedAmount: price
+                })
+              });
+              const verifyData = await verifyRes.json();
+              if (verifyRes.ok && verifyData.success) {
+                setIsVerifying(false);
+                onComplete(response.reference, 'PAYSTACK');
+              } else {
+                setPaymentError(verifyData.error || "Paystack payment verification failed on the server.");
+                setIsVerifying(false);
+              }
+            } catch (err) {
+              setPaymentError("Could not reach verification server.");
+              setIsVerifying(false);
+            }
+          },
+          onClose: () => {
+            setPaymentError("Paystack inline checkout window closed.");
+            setIsVerifying(false);
+          }
+        });
+        handler.openIframe();
+      } catch (e: any) {
+        setPaymentError(`Paystack pop setup error: ${e.message}`);
+        setIsVerifying(false);
+      }
     } else if (method === 'flutterwave') {
-      setTimeout(() => {
+      const pubKey = import.meta.env.VITE_FLUTTERWAVE_PUBLIC_KEY;
+      if (!pubKey) {
+        setPaymentError("Flutterwave payment checkout is not currently configured by the system owner. Please select another payment method.");
         setIsVerifying(false);
-        onComplete(`TX-FLUTTERWAVE-${Math.floor(100000 + Math.random() * 900000)}`, 'FLUTTERWAVE');
-      }, 2000);
+        return;
+      }
+
+      const loaded = await loadScript('https://checkout.flutterwave.com/v3.js');
+      if (!loaded) {
+        setPaymentError("Failed to initialize Flutterwave library.");
+        setIsVerifying(false);
+        return;
+      }
+
+      try {
+        const flutterwaveHandler = (window as any).FlutterwaveCheckout({
+          public_key: pubKey,
+          tx_ref: refNo,
+          amount: price,
+          currency: "NGN",
+          payment_options: "card, banktransfer, ussd",
+          customer: {
+            email: currentUser?.email || 'customer@goyeservices.com',
+            phone_number: currentUser?.phone || '08000000000',
+            name: currentUser?.name || 'Customer',
+          },
+          callback: async (response: any) => {
+            try {
+              const verifyRes = await fetch('/api/payments/flutterwave/verify', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  orderId: item.id,
+                  reference: response.tx_ref,
+                  transactionId: response.id || response.transaction_id,
+                  expectedAmount: price
+                })
+              });
+              const verifyData = await verifyRes.json();
+              if (verifyRes.ok && verifyData.success) {
+                setIsVerifying(false);
+                onComplete(response.tx_ref || response.id, 'FLUTTERWAVE');
+              } else {
+                setPaymentError(verifyData.error || "Flutterwave payment verification failed on the server.");
+                setIsVerifying(false);
+              }
+            } catch (err) {
+              setPaymentError("Could not reach verification server.");
+              setIsVerifying(false);
+            }
+          },
+          onclose: () => {
+            setPaymentError("Flutterwave inline checkout window closed.");
+            setIsVerifying(false);
+          }
+        });
+      } catch (e: any) {
+        setPaymentError(`Flutterwave setup error: ${e.message}`);
+        setIsVerifying(false);
+      }
     }
   };
 
