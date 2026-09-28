@@ -6,10 +6,20 @@ import { fileURLToPath } from 'url';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
 import fs from 'fs';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
 
 dotenv.config();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+const ADMIN_PASSWORD_HASH = process.env.ADMIN_PASSWORD_HASH || "";
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "GoyeBN3583773";
+const ADMIN_JWT_SECRET = process.env.ADMIN_JWT_SECRET || "goye_super_secret_jwt_key";
+
+if (!process.env.ADMIN_PASSWORD && !process.env.ADMIN_PASSWORD_HASH) {
+  console.warn("⚠️ [Security Warning] Neither ADMIN_PASSWORD nor ADMIN_PASSWORD_HASH env var is set. Set ADMIN_PASSWORD in Vercel Env Vars for production security. Falling back to default secure credential.");
+}
 
 const PROFILES_FILE = path.join(__dirname, 'user_profiles.json');
 
@@ -208,6 +218,77 @@ async function createServer() {
     };
     writeProfiles(profiles);
     res.json({ success: true, profile: profiles[id] });
+  });
+
+  // Secure endpoints for Admin authentication
+  app.post('/api/admin/login', (req, res) => {
+    const { password } = req.body;
+    if (!password) {
+      return res.status(400).json({ error: 'Password parameter is required' });
+    }
+
+    let isMatch = false;
+    if (ADMIN_PASSWORD_HASH) {
+      isMatch = bcrypt.compareSync(password, ADMIN_PASSWORD_HASH);
+    } else {
+      isMatch = (password === ADMIN_PASSWORD);
+    }
+
+    if (!isMatch) {
+      return res.status(401).json({ error: 'Invalid admin password' });
+    }
+
+    const token = jwt.sign({ role: 'admin' }, ADMIN_JWT_SECRET, { expiresIn: '8h' });
+    res.json({ token, role: 'admin', expiresIn: '8h' });
+  });
+
+  app.post('/api/admin/logout', (req, res) => {
+    res.json({ success: true, message: 'Session cleared successfully' });
+  });
+
+  app.get('/api/admin/verify', (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Access denied. Missing bearer token.' });
+    }
+
+    const token = authHeader.split(' ')[1];
+    try {
+      const decoded = jwt.verify(token, ADMIN_JWT_SECRET) as any;
+      if (decoded && decoded.role === 'admin') {
+        return res.json({ valid: true, role: 'admin' });
+      }
+      return res.status(401).json({ error: 'Invalid token structure.' });
+    } catch (err: any) {
+      return res.status(401).json({ error: 'Invalid or expired admin token.' });
+    }
+  });
+
+  app.get('/api/admin/profiles', (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Access denied. Missing bearer token.' });
+    }
+
+    const token = authHeader.split(' ')[1];
+    try {
+      const decoded = jwt.verify(token, ADMIN_JWT_SECRET) as any;
+      if (decoded && decoded.role === 'admin') {
+        const profiles = readProfiles();
+        const profileList = Object.values(profiles).map((p: any) => ({
+          id: p.id || '',
+          name: p.name || '',
+          email: p.email || '',
+          phone: p.phone || '',
+          role: p.role || 'customer',
+          updatedAt: p.updatedAt || 0
+        }));
+        return res.json(profileList);
+      }
+      return res.status(401).json({ error: 'Invalid token structure.' });
+    } catch (err: any) {
+      return res.status(401).json({ error: 'Invalid or expired admin token.' });
+    }
   });
 
   // --- Vite Integration / Static Serving ---

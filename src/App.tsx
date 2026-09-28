@@ -48,7 +48,6 @@ const ASSETS = {
 export const PI_TESTNET_WALLET = "GASU7HADLZKZE4A6EPRWW5QNMGHQBSL6FR3ED4N4ZR3KYDQRQXGQTJLX";
 export const PI_MAINNET_WALLET = "GBR4B47WY7JDK2JKUUQQTWWQENOUUYTAQAOYLXZ7XE36YFQY6LKPVO6R";
 const BRAND_GOLD = "#FFD700";
-const ADMIN_PASSWORD = "GoyeBN3583773";
 
 // --- Types ---
 type Section = 'home' | 'services' | 'dashboard' | 'admin' | 'faq' | 'about' | 'contact' | 'legal' | 'privacy-policy' | 'terms-of-service';
@@ -370,6 +369,74 @@ export default function App() {
   const [supportTickets, setSupportTickets] = useState<SupportTicket[]>([]);
   const [documents, setDocuments] = useState<GoyeDocument[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+
+  const [adminToken, setAdminToken] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('goye_admin_token');
+    }
+    return null;
+  });
+  const [isAdminVerified, setIsAdminVerified] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    if (activeSection === 'admin') {
+      if (!adminToken) {
+        setIsAdminVerified(false);
+      } else {
+        fetch('/api/admin/verify', {
+          headers: {
+            'Authorization': `Bearer ${adminToken}`
+          }
+        })
+        .then(res => {
+          if (res.ok) return res.json();
+          throw new Error('Invalid token');
+        })
+        .then(data => {
+          if (data.valid) {
+            setIsAdminVerified(true);
+          } else {
+            setIsAdminVerified(false);
+            localStorage.removeItem('goye_admin_token');
+            setAdminToken(null);
+          }
+        })
+        .catch(() => {
+          setIsAdminVerified(false);
+          localStorage.removeItem('goye_admin_token');
+          setAdminToken(null);
+        });
+      }
+    }
+  }, [activeSection, adminToken]);
+
+  const handleAdminLogin = async (password: string) => {
+    try {
+      const res = await fetch('/api/admin/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        localStorage.setItem('goye_admin_token', data.token);
+        setAdminToken(data.token);
+        setIsAdminVerified(true);
+        return { success: true };
+      } else {
+        const errData = await res.json();
+        return { success: false, error: errData.error || 'Invalid admin password' };
+      }
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Connection error' };
+    }
+  };
+
+  const handleAdminLogout = () => {
+    localStorage.removeItem('goye_admin_token');
+    setAdminToken(null);
+    setIsAdminVerified(false);
+  };
 
   // Secure local state initialized with Goye Hub Testnet wallet and real Mainnet KYC wallet role
   const [piConfig, setPiConfig] = useState({
@@ -782,7 +849,24 @@ export default function App() {
           />
         )}
         {activeSection === 'dashboard' && <DashboardView currentUser={currentUser} onAuth={handleRegister} onLogout={handleLogout} setCurrentUser={setCurrentUser} requests={requests} quotes={quotes} onPay={handlePaymentInitiated} supportTickets={supportTickets} setSupportTickets={setSupportTickets} documents={documents} setRequests={setRequests} isPiBrowser={isPiBrowser} onPiRegister={(p: any) => { setCurrentUser(p); saveState('goye_user_profile', p); logAction(p.name, 'User Registered via Pi SDK', p.id); }} />}
-        {activeSection === 'admin' && <AdminView currentUser={currentUser} requests={requests} setRequests={setRequests} quotes={quotes} setQuotes={setQuotes} auditLogs={auditLogs} piConfig={piConfig} onUpdatePiConfig={handleUpdatePiConfig} />}
+        {activeSection === 'admin' && (
+          isAdminVerified ? (
+            <AdminView 
+              currentUser={currentUser} 
+              requests={requests} 
+              setRequests={setRequests} 
+              quotes={quotes} 
+              setQuotes={setQuotes} 
+              auditLogs={auditLogs} 
+              piConfig={piConfig} 
+              onUpdatePiConfig={handleUpdatePiConfig}
+              onLogout={handleAdminLogout}
+              adminToken={adminToken}
+            />
+          ) : (
+            <AdminLoginScreen onLogin={handleAdminLogin} />
+          )
+        )}
         {activeSection === 'faq' && <FaqView />}
         {activeSection === 'about' && <AboutView />}
         {activeSection === 'contact' && <ContactView config={config} />}
@@ -1933,9 +2017,7 @@ function DashboardView({ currentUser, onAuth, onLogout, setCurrentUser, requests
 }
 
 // --- Admin Control View ---
-function AdminView({ currentUser, requests, setRequests, quotes, setQuotes, auditLogs, piConfig, onUpdatePiConfig }: { currentUser: UserProfile | null, requests: ServiceRequest[], setRequests: any, quotes: Quote[], setQuotes: any, auditLogs: AuditLog[], piConfig: any, onUpdatePiConfig: (cfg: any) => void }) {
-  const [adminPass, setAdminPass] = useState('');
-  const [isUnlocked, setIsUnlocked] = useState(false);
+function AdminView({ currentUser, requests, setRequests, quotes, setQuotes, auditLogs, piConfig, onUpdatePiConfig, onLogout, adminToken }: { currentUser: UserProfile | null, requests: ServiceRequest[], setRequests: any, quotes: Quote[], setQuotes: any, auditLogs: AuditLog[], piConfig: any, onUpdatePiConfig: (cfg: any) => void, onLogout: () => void, adminToken: string | null }) {
   const [selectedReq, setSelectedReq] = useState<ServiceRequest | null>(null);
 
   // Quote form state
@@ -1944,6 +2026,7 @@ function AdminView({ currentUser, requests, setRequests, quotes, setQuotes, audi
 
   const [healthMetrics, setHealthMetrics] = useState<any>(null);
   const [liveValidation, setLiveValidation] = useState<'LOADING' | 'PASS' | 'FAIL'>('LOADING');
+  const [userProfiles, setUserProfiles] = useState<any[]>([]);
 
   useEffect(() => {
     fetch('/api/health')
@@ -1956,24 +2039,21 @@ function AdminView({ currentUser, requests, setRequests, quotes, setQuotes, audi
       .catch(() => setLiveValidation('FAIL'));
   }, []);
 
+  useEffect(() => {
+    if (adminToken) {
+      fetch('/api/admin/profiles', {
+        headers: {
+          'Authorization': `Bearer ${adminToken}`
+        }
+      })
+      .then(res => res.ok ? res.json() : [])
+      .then(data => setUserProfiles(data))
+      .catch(err => console.warn("Failed to load user profiles in admin", err));
+    }
+  }, [adminToken]);
+
   if (!currentUser || currentUser.role !== 'admin') {
     return <div className="text-center py-24 text-red-500 uppercase font-black tracking-widest">Access Restricted to Administrators</div>;
-  }
-
-  if (!isUnlocked) {
-    return (
-      <div className="max-w-md mx-auto px-4 py-24 text-center">
-        <div className="bg-white border border-gray-100 rounded-3xl p-10 shadow-lg">
-          <Lock className="mx-auto mb-6 text-yellow-500" size={48} />
-          <h2 className="text-3xl font-black uppercase mb-1 tracking-tighter text-slate-900">Admin Verification</h2>
-          <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mb-10">Provide security password to unlock cockpit</p>
-          <form className="space-y-4" onSubmit={e => { e.preventDefault(); if (adminPass === ADMIN_PASSWORD) setIsUnlocked(true); else alert('Incorrect Credentials'); }}>
-            <FormInput label="Security Key" type="password" required onChange={setAdminPass} />
-            <button className="w-full bg-[#FFD700] hover:bg-yellow-400 text-black py-4 rounded-xl font-black uppercase tracking-widest">Unlock System</button>
-          </form>
-        </div>
-      </div>
-    );
   }
 
   const handleUpdateStatus = (id: string, status: ServiceRequest['status']) => {
@@ -2013,14 +2093,35 @@ function AdminView({ currentUser, requests, setRequests, quotes, setQuotes, audi
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-12 text-slate-900">
+      {/* Secure Header Top Bar */}
+      <div className="bg-neutral-950 text-white rounded-3xl p-6 mb-10 border border-yellow-500/15 flex flex-col md:flex-row justify-between items-center gap-4">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 bg-yellow-500/10 rounded-xl border border-yellow-500/25 text-[#FFD700]">
+            <Shield size={20} />
+          </div>
+          <div className="text-left">
+            <h2 className="text-sm font-black uppercase tracking-widest text-white">ADMIN: GOYE SERVICES HUB</h2>
+            <p className="text-[9px] uppercase tracking-wider text-gray-500 font-bold">SECURE OPERATIONAL CONTROL COCKPIT</p>
+          </div>
+        </div>
+        <button 
+          onClick={onLogout}
+          className="bg-red-500 hover:bg-red-600 text-white px-5 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow cursor-pointer"
+        >
+          LOGOUT ADMIN
+        </button>
+      </div>
+
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-8 mb-16">
         <div>
           <h2 className="text-3xl md:text-5xl font-black uppercase tracking-tighter mb-2 text-slate-900">Admin Control Hub</h2>
           <p className="text-gray-400 font-bold text-xs uppercase tracking-widest">Operations Platform</p>
         </div>
-        <div className="flex gap-4">
+        <div className="flex flex-wrap gap-4">
+          <StatMini label="Total Orders" value={requests.length} />
+          <StatMini label="Paid Orders" value={requests.filter(r => r.status === 'PAYMENT VERIFIED' || r.status === 'COMPLETED').length} />
+          <StatMini label="Pending Orders" value={requests.filter(r => r.status !== 'PAYMENT VERIFIED' && r.status !== 'COMPLETED').length} />
           <StatMini label="Total Revenue" value={`₦${requests.filter(r => r.status === 'PAYMENT VERIFIED' || r.status === 'COMPLETED').reduce((acc, r) => acc + r.amount, 0).toLocaleString()}`} />
-          <StatMini label="Requests" value={requests.length} />
         </div>
       </div>
 
@@ -2063,6 +2164,43 @@ function AdminView({ currentUser, requests, setRequests, quotes, setQuotes, audi
                     </td>
                   </tr>
                 ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* User Profiles Display Section */}
+        <div className="lg:col-span-2 space-y-6 bg-white border border-gray-100 rounded-3xl p-8 shadow-sm text-left">
+          <h3 className="text-sm font-black uppercase tracking-widest text-slate-900 mb-6">User Profiles Overview</h3>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-50 text-[9px] font-black uppercase tracking-widest text-gray-400 border-b border-gray-100">
+                <tr>
+                  <th className="p-4">Name</th>
+                  <th className="p-4">Email</th>
+                  <th className="p-4">Phone</th>
+                  <th className="p-4">Role</th>
+                </tr>
+              </thead>
+              <tbody className="font-bold text-slate-700 uppercase">
+                {userProfiles.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="p-4 text-center text-gray-400 text-[10px] uppercase tracking-wider font-bold">No registered profiles on the server yet.</td>
+                  </tr>
+                ) : (
+                  userProfiles.map(p => (
+                    <tr key={p.id} className="border-t border-gray-100">
+                      <td className="p-4 text-slate-900">{p.name || 'Anonymous User'}</td>
+                      <td className="p-4 lowercase text-slate-600 font-medium">{p.email || 'N/A'}</td>
+                      <td className="p-4 text-slate-900">{p.phone || 'N/A'}</td>
+                      <td className="p-4">
+                        <span className={`px-2 py-0.5 rounded text-[8px] font-black tracking-widest ${p.role === 'admin' ? 'bg-yellow-100 text-yellow-800' : 'bg-slate-100 text-slate-700'}`}>
+                          {p.role ? p.role.toUpperCase() : 'CUSTOMER'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -2219,6 +2357,75 @@ function AdminView({ currentUser, requests, setRequests, quotes, setQuotes, audi
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+// --- Admin Login Screen View ---
+function AdminLoginScreen({ onLogin }: { onLogin: (password: string) => Promise<{ success: boolean; error?: string }> }) {
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    const res = await onLogin(password);
+    setLoading(false);
+    if (!res.success) {
+      setError(res.error || 'Invalid admin credentials');
+    }
+  };
+
+  return (
+    <div className="min-h-[70vh] flex items-center justify-center bg-black py-16 px-6">
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="w-full max-w-[400px] bg-neutral-950 border border-yellow-500/20 rounded-3xl p-8 shadow-2xl space-y-6 text-center"
+      >
+        <div className="flex flex-col items-center space-y-3">
+          <div className="p-4 bg-yellow-500/10 rounded-full border border-yellow-500/20 animate-pulse text-[#FFD700]">
+            <Shield className="w-10 h-10" />
+          </div>
+          <h2 className="text-sm font-black uppercase tracking-widest text-[#FFD700]">ADMIN MANAGEMENT</h2>
+          <p className="text-[10px] uppercase text-gray-500 tracking-wider font-bold">SECURE ACCESS AREA</p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4 text-left">
+          <div className="space-y-1">
+            <label className="text-[9px] uppercase tracking-wider text-gray-400 font-bold">Enter Shield Credentials</label>
+            <input 
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••••••"
+              disabled={loading}
+              className="w-full p-3 bg-neutral-900 border border-neutral-800 rounded-xl text-white font-mono focus:outline-none focus:border-[#FFD700] transition-all text-center tracking-widest text-sm"
+              required
+            />
+          </div>
+
+          {error && (
+            <div className="p-3 bg-red-950/40 border border-red-500/20 rounded-xl text-red-400 text-[10px] uppercase tracking-wider font-bold text-center">
+              {error}
+            </div>
+          )}
+
+          <button 
+            type="submit"
+            disabled={loading}
+            className="w-full bg-[#FFD700] hover:bg-yellow-400 disabled:bg-neutral-800 disabled:text-neutral-500 text-black p-3.5 rounded-xl font-black text-[11px] uppercase tracking-widest transition-all shadow-md cursor-pointer"
+          >
+            {loading ? 'VERIFYING...' : 'UNLOCK DASHBOARD'}
+          </button>
+        </form>
+
+        <p className="text-[9px] text-gray-600 font-medium">
+          Authorized personnel only. All access attempts are recorded.
+        </p>
+      </motion.div>
     </div>
   );
 }
