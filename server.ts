@@ -127,26 +127,84 @@ async function createServer() {
       if (!PI_API_KEY) {
         return res.status(500).json({ status: false, message: 'PI_API_KEY is not configured on the server-side.' });
       }
-      // Official Pi Platform API call for payment completion
+
+      // 1. Fetch payment details from official Pi Network to verify integrity
+      let piPaymentData;
+      try {
+        const paymentResponse = await axios.get(`https://api.minepi.com/v2/payments/${paymentId}`, {
+          headers: {
+            Authorization: `Key ${PI_API_KEY}`
+          }
+        });
+        piPaymentData = paymentResponse.data;
+      } catch (e: any) {
+        console.error("Failed to retrieve payment details from Pi API: ", e.message);
+        return res.status(400).json({ status: 'error', message: 'Invalid or fraudulent Pi paymentId.' });
+      }
+
+      // 2. Authoritative check on database matching
+      const db = readOrdersDB();
+      db.requests = db.requests || [];
+      db.quotes = db.quotes || [];
+
+      const order = db.requests.find((r: any) => r.id === orderId);
+      const quote = db.quotes.find((q: any) => q.id === orderId || q.requestId === orderId);
+
+      const targetOrder = order || quote;
+      if (!targetOrder) {
+        return res.status(404).json({ status: 'error', message: 'Matching order not found on server' });
+      }
+
+      const orderAmount = order ? order.amount : (quote ? quote.total : 0);
+      const expectedPiAmount = Number((orderAmount / 1000).toFixed(2));
+
+      // 3. Verify that metadata contains the correct requestId to prevent spoofing
+      if (piPaymentData.metadata?.requestId !== orderId) {
+        return res.status(400).json({ status: 'error', message: 'Payment metadata requestId mismatch. Fraud alert.' });
+      }
+
+      // 4. Verify exact amount paid matches expected payment amount
+      if (Math.abs(piPaymentData.amount - expectedPiAmount) > 0.01) {
+        return res.status(400).json({ status: 'error', message: `Amount mismatch. Expected ${expectedPiAmount} Pi, received ${piPaymentData.amount} Pi` });
+      }
+
+      // 5. Verify the payment hasn't already been completed/fulfilled
+      if (piPaymentData.status?.developer_completed) {
+        return res.status(400).json({ status: 'error', message: 'This Pi payment has already been completed and processed.' });
+      }
+
+      // 6. Complete the payment with official Pi Platform API call
       const response = await axios.post(`https://api.minepi.com/v2/payments/${paymentId}/complete`, { txid }, {
         headers: {
           Authorization: `Key ${PI_API_KEY}`
         }
       });
 
-      // Update the request status securely if orderId is provided
-      if (orderId) {
-        const db = readOrdersDB();
-        db.requests = db.requests || [];
+      // 7. Update status to PAYMENT VERIFIED authoritatively on server
+      if (order) {
         const idx = db.requests.findIndex((r: any) => r.id === orderId);
         if (idx >= 0) {
           db.requests[idx].status = 'PAYMENT VERIFIED';
           db.requests[idx].paymentRef = txid;
           db.requests[idx].paymentProvider = 'PI_NETWORK';
           db.requests[idx].updatedAt = Date.now();
-          writeOrdersDB(db);
+        }
+      } else if (quote) {
+        const idx = db.quotes.findIndex((q: any) => q.id === quote.id);
+        if (idx >= 0) {
+          db.quotes[idx].status = 'PAID';
+          db.quotes[idx].updatedAt = Date.now();
+          // Find associated request and mark PAYMENT VERIFIED as well
+          const assocIdx = db.requests.findIndex((r: any) => r.id === quote.requestId);
+          if (assocIdx >= 0) {
+            db.requests[assocIdx].status = 'PAYMENT VERIFIED';
+            db.requests[assocIdx].paymentRef = txid;
+            db.requests[assocIdx].paymentProvider = 'PI_NETWORK';
+            db.requests[assocIdx].updatedAt = Date.now();
+          }
         }
       }
+      writeOrdersDB(db);
 
       res.json({ status: 'success', message: 'Pi Blockchain Transaction Verified & Completed Server-Side', data: response.data });
     } catch (error: any) {
@@ -373,10 +431,13 @@ async function createServer() {
     const db = readOrdersDB();
     db.requests = db.requests || [];
 
-    // Enforce that new orders must always start in unpaid state
+    // Authoritatively restrict status to harmless unpaid statuses only for client submission
+    const allowedUnpaidStatuses = ['DRAFT', 'SUBMITTED', 'UNDER REVIEW', 'AWAITING CUSTOMER INFORMATION', 'QUOTE READY', 'PAYMENT PENDING', 'CANCELLED'];
+    const safeStatus = allowedUnpaidStatuses.includes(request.status) ? request.status : 'PAYMENT PENDING';
+
     const cleanRequest = {
       ...request,
-      status: request.status === 'PAYMENT VERIFIED' || request.status === 'COMPLETED' ? 'PAYMENT PENDING' : (request.status || 'PAYMENT PENDING'),
+      status: safeStatus,
       paymentRef: undefined,
       paymentProvider: undefined,
       updatedAt: Date.now()
@@ -471,9 +532,9 @@ async function createServer() {
   });
 
   app.post('/api/payments/paystack/verify', async (req, res) => {
-    const { orderId, reference, expectedAmount } = req.body;
-    if (!orderId || !reference || !expectedAmount) {
-      return res.status(400).json({ error: 'Missing required validation parameters' });
+    const { orderId, reference, userId } = req.body;
+    if (!orderId || !reference || !userId) {
+      return res.status(400).json({ error: 'Missing required validation parameters (orderId, reference, userId)' });
     }
 
     if (!PAYSTACK_SECRET_KEY) {
@@ -482,10 +543,35 @@ async function createServer() {
 
     const db = readOrdersDB();
     db.requests = db.requests || [];
-    
-    // Verify reference uniqueness to prevent transaction reuse
-    const alreadyUsed = db.requests.some((r: any) => r.paymentRef === reference && r.id !== orderId && r.status === 'PAYMENT VERIFIED');
-    if (alreadyUsed) {
+    db.quotes = db.quotes || [];
+
+    // Find order or quote authoritatively from database state
+    const order = db.requests.find((r: any) => r.id === orderId);
+    const quote = db.quotes.find((q: any) => q.id === orderId || q.requestId === orderId);
+
+    const targetOrder = order || quote;
+    if (!targetOrder) {
+      return res.status(404).json({ error: 'Matching order not found on server.' });
+    }
+
+    // Verify ownership: order/associated-request userId must match requesting userId
+    let orderUserId = order ? order.userId : '';
+    if (quote && !orderUserId) {
+      const assoc = db.requests.find((r: any) => r.id === quote.requestId);
+      if (assoc) orderUserId = assoc.userId;
+    }
+
+    if (orderUserId !== userId) {
+      return res.status(403).json({ error: 'Order ownership validation failed. Unauthorized.' });
+    }
+
+    // Determine target order number / reference to verify Paystack transaction matches this specific order
+    const targetOrderNumber = order ? order.requestNumber : (quote ? quote.quoteNumber : '');
+
+    // Verify reference uniqueness to prevent transaction reuse across requests or quotes
+    const alreadyUsedRequests = db.requests.some((r: any) => r.paymentRef === reference && r.id !== orderId && r.status === 'PAYMENT VERIFIED');
+    const alreadyUsedQuotes = db.quotes.some((q: any) => q.paymentRef === reference && q.id !== orderId && q.status === 'PAID');
+    if (alreadyUsedRequests || alreadyUsedQuotes) {
       return res.status(400).json({ error: 'Transaction reference has already been used for another order.' });
     }
 
@@ -499,27 +585,50 @@ async function createServer() {
       const data = apiResponse.data?.data;
       if (apiResponse.data?.status && data?.status === 'success') {
         const receivedAmountInKobo = data.amount;
-        const expectedAmountInKobo = expectedAmount * 100;
+        
+        // Authoritative amount calculation strictly from backend DB
+        const price = order ? order.amount : (quote ? quote.total : 0);
+        const expectedAmountInKobo = price * 100;
 
         if (receivedAmountInKobo < expectedAmountInKobo) {
-          return res.status(400).json({ error: `Amount mismatch. Expected ₦${expectedAmount}, received ₦${receivedAmountInKobo / 100}` });
+          return res.status(400).json({ error: `Amount mismatch. Expected ₦${price}, received ₦${receivedAmountInKobo / 100}` });
         }
 
         if (data.currency !== 'NGN') {
           return res.status(400).json({ error: `Currency mismatch. Expected NGN, received ${data.currency}` });
         }
 
-        const idx = db.requests.findIndex((r: any) => r.id === orderId);
-        if (idx >= 0) {
-          db.requests[idx].status = 'PAYMENT VERIFIED';
-          db.requests[idx].paymentRef = reference;
-          db.requests[idx].paymentProvider = 'PAYSTACK';
-          db.requests[idx].updatedAt = Date.now();
-          writeOrdersDB(db);
-          return res.json({ success: true, request: db.requests[idx] });
-        } else {
-          return res.status(404).json({ error: 'Order not found to associate with payment.' });
+        // Verify transaction belongs to the expected order/reference (or reference matched)
+        if (data.reference !== targetOrderNumber && data.reference !== reference) {
+          return res.status(400).json({ error: 'Transaction belongs to a different order/reference.' });
         }
+
+        // Update database status authoritatively on server
+        if (order) {
+          const idx = db.requests.findIndex((r: any) => r.id === orderId);
+          if (idx >= 0) {
+            db.requests[idx].status = 'PAYMENT VERIFIED';
+            db.requests[idx].paymentRef = reference;
+            db.requests[idx].paymentProvider = 'PAYSTACK';
+            db.requests[idx].updatedAt = Date.now();
+          }
+        } else if (quote) {
+          const idx = db.quotes.findIndex((q: any) => q.id === quote.id);
+          if (idx >= 0) {
+            db.quotes[idx].status = 'PAID';
+            db.quotes[idx].updatedAt = Date.now();
+            const assocIdx = db.requests.findIndex((r: any) => r.id === quote.requestId);
+            if (assocIdx >= 0) {
+              db.requests[assocIdx].status = 'PAYMENT VERIFIED';
+              db.requests[assocIdx].paymentRef = reference;
+              db.requests[assocIdx].paymentProvider = 'PAYSTACK';
+              db.requests[assocIdx].updatedAt = Date.now();
+            }
+          }
+        }
+
+        writeOrdersDB(db);
+        return res.json({ success: true, request: order || db.requests.find((r: any) => r.id === quote?.requestId) });
       } else {
         return res.status(400).json({ error: 'Transaction is not in a successful state on Paystack.' });
       }
@@ -530,9 +639,9 @@ async function createServer() {
   });
 
   app.post('/api/payments/flutterwave/verify', async (req, res) => {
-    const { orderId, reference, expectedAmount, transactionId } = req.body;
-    if (!orderId || !expectedAmount || (!reference && !transactionId)) {
-      return res.status(400).json({ error: 'Missing required validation parameters' });
+    const { orderId, reference, transactionId, userId } = req.body;
+    if (!orderId || !userId || (!reference && !transactionId)) {
+      return res.status(400).json({ error: 'Missing required validation parameters (orderId, reference, transactionId, userId)' });
     }
 
     if (!FLUTTERWAVE_SECRET_KEY) {
@@ -541,10 +650,35 @@ async function createServer() {
 
     const db = readOrdersDB();
     db.requests = db.requests || [];
+    db.quotes = db.quotes || [];
+
+    // Find order or quote authoritatively
+    const order = db.requests.find((r: any) => r.id === orderId);
+    const quote = db.quotes.find((q: any) => q.id === orderId || q.requestId === orderId);
+
+    const targetOrder = order || quote;
+    if (!targetOrder) {
+      return res.status(404).json({ error: 'Matching order not found on server.' });
+    }
+
+    // Verify ownership: order/associated-request userId must match requesting userId
+    let orderUserId = order ? order.userId : '';
+    if (quote && !orderUserId) {
+      const assoc = db.requests.find((r: any) => r.id === quote.requestId);
+      if (assoc) orderUserId = assoc.userId;
+    }
+
+    if (orderUserId !== userId) {
+      return res.status(403).json({ error: 'Order ownership validation failed. Unauthorized.' });
+    }
+
+    // Determine target order number / reference to verify Flutterwave transaction matches this specific order
+    const targetOrderNumber = order ? order.requestNumber : (quote ? quote.quoteNumber : '');
 
     const lookupRef = reference || transactionId;
-    const alreadyUsed = db.requests.some((r: any) => r.paymentRef === lookupRef && r.id !== orderId && r.status === 'PAYMENT VERIFIED');
-    if (alreadyUsed) {
+    const alreadyUsedRequests = db.requests.some((r: any) => r.paymentRef === lookupRef && r.id !== orderId && r.status === 'PAYMENT VERIFIED');
+    const alreadyUsedQuotes = db.quotes.some((q: any) => q.paymentRef === lookupRef && q.id !== orderId && q.status === 'PAID');
+    if (alreadyUsedRequests || alreadyUsedQuotes) {
       return res.status(400).json({ error: 'Transaction reference has already been used for another order.' });
     }
 
@@ -558,25 +692,49 @@ async function createServer() {
       const data = apiResponse.data?.data;
       if (apiResponse.data?.status === 'success' && data?.status === 'successful') {
         const receivedAmount = data.amount;
-        if (receivedAmount < expectedAmount) {
-          return res.status(400).json({ error: `Amount mismatch. Expected ₦${expectedAmount}, received ₦${receivedAmount}` });
+        
+        // Authoritative amount calculation strictly from backend DB
+        const price = order ? order.amount : (quote ? quote.total : 0);
+
+        if (receivedAmount < price) {
+          return res.status(400).json({ error: `Amount mismatch. Expected ₦${price}, received ₦${receivedAmount}` });
         }
 
         if (data.currency !== 'NGN') {
           return res.status(400).json({ error: `Currency mismatch. Expected NGN, received ${data.currency}` });
         }
 
-        const idx = db.requests.findIndex((r: any) => r.id === orderId);
-        if (idx >= 0) {
-          db.requests[idx].status = 'PAYMENT VERIFIED';
-          db.requests[idx].paymentRef = lookupRef;
-          db.requests[idx].paymentProvider = 'FLUTTERWAVE';
-          db.requests[idx].updatedAt = Date.now();
-          writeOrdersDB(db);
-          return res.json({ success: true, request: db.requests[idx] });
-        } else {
-          return res.status(404).json({ error: 'Order not found to associate with payment.' });
+        // Verify transaction belongs to the expected order/reference (tx_ref)
+        if (data.tx_ref !== targetOrderNumber && data.tx_ref !== reference) {
+          return res.status(400).json({ error: 'Transaction belongs to a different order/reference.' });
         }
+
+        // Update database status authoritatively on server
+        if (order) {
+          const idx = db.requests.findIndex((r: any) => r.id === orderId);
+          if (idx >= 0) {
+            db.requests[idx].status = 'PAYMENT VERIFIED';
+            db.requests[idx].paymentRef = lookupRef;
+            db.requests[idx].paymentProvider = 'FLUTTERWAVE';
+            db.requests[idx].updatedAt = Date.now();
+          }
+        } else if (quote) {
+          const idx = db.quotes.findIndex((q: any) => q.id === quote.id);
+          if (idx >= 0) {
+            db.quotes[idx].status = 'PAID';
+            db.quotes[idx].updatedAt = Date.now();
+            const assocIdx = db.requests.findIndex((r: any) => r.id === quote.requestId);
+            if (assocIdx >= 0) {
+              db.requests[assocIdx].status = 'PAYMENT VERIFIED';
+              db.requests[assocIdx].paymentRef = lookupRef;
+              db.requests[assocIdx].paymentProvider = 'FLUTTERWAVE';
+              db.requests[assocIdx].updatedAt = Date.now();
+            }
+          }
+        }
+
+        writeOrdersDB(db);
+        return res.json({ success: true, request: order || db.requests.find((r: any) => r.id === quote?.requestId) });
       } else {
         return res.status(400).json({ error: 'Transaction is not successful on Flutterwave.' });
       }
@@ -587,26 +745,55 @@ async function createServer() {
   });
 
   app.post('/api/payments/crypto/submit', (req, res) => {
-    const { orderId, txHash, provider } = req.body;
-    if (!orderId || !txHash || !provider) {
-      return res.status(400).json({ error: 'Missing payment metadata' });
+    const { orderId, txHash, provider, userId } = req.body;
+    if (!orderId || !txHash || !provider || !userId) {
+      return res.status(400).json({ error: 'Missing payment metadata (orderId, txHash, provider, userId)' });
     }
 
     const db = readOrdersDB();
     db.requests = db.requests || [];
-    
-    const idx = db.requests.findIndex((r: any) => r.id === orderId);
-    if (idx >= 0) {
-      // Must strictly remain PAYMENT PENDING until manual administrator verification
-      db.requests[idx].status = 'PAYMENT PENDING';
-      db.requests[idx].paymentRef = txHash;
-      db.requests[idx].paymentProvider = provider;
-      db.requests[idx].updatedAt = Date.now();
-      writeOrdersDB(db);
-      return res.json({ success: true, request: db.requests[idx] });
+    db.quotes = db.quotes || [];
+
+    const order = db.requests.find((r: any) => r.id === orderId);
+    const quote = db.quotes.find((q: any) => q.id === orderId || q.requestId === orderId);
+
+    const targetOrder = order || quote;
+    if (!targetOrder) {
+      return res.status(404).json({ error: 'Matching order not found on server.' });
     }
 
-    res.status(404).json({ error: 'Order not found' });
+    // Verify ownership: order/associated-request userId must match requesting userId
+    let orderUserId = order ? order.userId : '';
+    if (quote && !orderUserId) {
+      const assoc = db.requests.find((r: any) => r.id === quote.requestId);
+      if (assoc) orderUserId = assoc.userId;
+    }
+
+    if (orderUserId !== userId) {
+      return res.status(403).json({ error: 'Order ownership validation failed. Unauthorized.' });
+    }
+
+    // Must strictly remain PAYMENT PENDING until manual administrator verification
+    if (order) {
+      const idx = db.requests.findIndex((r: any) => r.id === orderId);
+      if (idx >= 0) {
+        db.requests[idx].status = 'PAYMENT PENDING';
+        db.requests[idx].paymentRef = txHash;
+        db.requests[idx].paymentProvider = provider;
+        db.requests[idx].updatedAt = Date.now();
+      }
+    } else if (quote) {
+      const idx = db.quotes.findIndex((q: any) => q.id === quote.id);
+      if (idx >= 0) {
+        db.quotes[idx].status = 'PENDING'; // Still pending crypto verification
+        db.quotes[idx].paymentRef = txHash;
+        db.quotes[idx].paymentProvider = provider;
+        db.quotes[idx].updatedAt = Date.now();
+      }
+    }
+
+    writeOrdersDB(db);
+    res.json({ success: true, request: order || db.requests.find((r: any) => r.id === quote?.requestId) });
   });
 
   // --- Vite Integration / Static Serving ---

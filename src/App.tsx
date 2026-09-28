@@ -2711,7 +2711,8 @@ function CheckoutModal({ item, isPiBrowser, onClose, onComplete, piConfig, curre
           body: JSON.stringify({
             orderId: item.id,
             txHash: txHash.trim(),
-            provider: method === 'usdt' ? 'USDT_BEP20' : 'USDC_BASE'
+            provider: method === 'usdt' ? 'USDT_BEP20' : 'USDC_BASE',
+            userId: currentUser?.id
           })
         });
         if (res.ok) {
@@ -2757,7 +2758,7 @@ function CheckoutModal({ item, isPiBrowser, onClose, onComplete, piConfig, curre
                 body: JSON.stringify({
                   orderId: item.id,
                   reference: response.reference,
-                  expectedAmount: price
+                  userId: currentUser?.id
                 })
               });
               const verifyData = await verifyRes.json();
@@ -2819,7 +2820,7 @@ function CheckoutModal({ item, isPiBrowser, onClose, onComplete, piConfig, curre
                   orderId: item.id,
                   reference: response.tx_ref,
                   transactionId: response.id || response.transaction_id,
-                  expectedAmount: price
+                  userId: currentUser?.id
                 })
               });
               const verifyData = await verifyRes.json();
