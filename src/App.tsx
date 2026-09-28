@@ -941,9 +941,20 @@ function HomeView({ onExplore, isPiBrowser, piConfig }: { onExplore: (category?:
       <section className="bg-[#f8f9fa] py-24 px-6">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-5xl font-black uppercase tracking-tight mb-4 text-[#0a0a0a]">Core Service Divisions</h2>
-            <p className="text-gray-500 max-w-xl mx-auto font-medium text-sm">Professional expertise tailored exactly for modern African and global operations.</p>
+            <h2 className="text-3xl md:text-5xl font-black uppercase tracking-tight mb-4 text-[#0a0a0a]">OUR SERVICES</h2>
+            <p className="text-gray-500 max-w-xl mx-auto font-medium text-sm">Professional services to help you build, launch, automate and grow your business.</p>
           </div>
+
+          {/* Combined Services Overview Graphic Banner */}
+          <div className="mb-20 max-w-5xl mx-auto overflow-hidden rounded-[24px] border border-yellow-500/10 shadow-2xl bg-black">
+            <img 
+              src="/goye_combined_services.jpg" 
+              alt="GOYE SERVICES HUB — CAC Services, Website Development, AI Bots and Digital Business Solutions" 
+              className="w-full h-auto object-cover display-block select-none"
+              loading="lazy"
+            />
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 max-w-7xl mx-auto">
             <ServiceHomeCard 
               image={ASSETS.CAC_IMG}
