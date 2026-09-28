@@ -944,12 +944,12 @@ function HomeView({ onExplore, isPiBrowser, piConfig }: { onExplore: (category?:
             <h2 className="text-3xl md:text-5xl font-black uppercase tracking-tight mb-4 text-[#0a0a0a]">Core Service Divisions</h2>
             <p className="text-gray-500 max-w-xl mx-auto font-medium text-sm">Professional expertise tailored exactly for modern African and global operations.</p>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 max-w-7xl mx-auto">
             <ServiceHomeCard 
               image={ASSETS.CAC_IMG}
               badge="CAC DIVISION"
               title="CAC Services"
-              desc="Expert business registration and LLC incorporation support. Subject to Corporate Affairs Commission requirements."
+              desc="Business registration assistance, CAC filing preparation, annual returns support, Incorporated Trustee support, and related business-registration assistance."
               price="₦15,000"
               btn="Explore CAC"
               onClick={() => onExplore('CAC')}
@@ -957,8 +957,8 @@ function HomeView({ onExplore, isPiBrowser, piConfig }: { onExplore: (category?:
             <ServiceHomeCard 
               image={ASSETS.WEB_IMG}
               badge="WEB DIVISION"
-              title="Web Development"
-              desc="E-commerce store setups with seamless payment integrations and automated checkouts."
+              title="Website Development"
+              desc="Professional business websites, web applications, stores, portals, booking systems, dashboards, and custom digital platforms."
               price="₦45,000"
               btn="Build Web"
               onClick={() => onExplore('WEB')}
@@ -966,11 +966,20 @@ function HomeView({ onExplore, isPiBrowser, piConfig }: { onExplore: (category?:
             <ServiceHomeCard 
               image={ASSETS.AI_IMG}
               badge="AI DIVISION"
-              title="AI Automations"
-              desc="Smart business AI assistants designed to automate chats, stock tracking, and orders directly on WhatsApp."
+              title="AI Bots"
+              desc="AI chatbots, AI customer-support assistants, AI sales assistants, FAQ assistants, WhatsApp/website AI solutions, and business automation where actually implemented."
               price="₦35,000"
               btn="Build AI Bot"
               onClick={() => onExplore('AI')}
+            />
+            <ServiceHomeCard 
+              image={ASSETS.DIGITAL_IMG}
+              badge="DIGITAL DIVISION"
+              title="Digital Business Solutions"
+              desc="Business setup and digital support solutions, including business documents, digital business tools, workflow solutions, online presence support, and other legitimate digital business services offered by GOYE SERVICES HUB."
+              price="₦10,000"
+              btn="Explore Solutions"
+              onClick={() => onExplore('DIG')}
             />
           </div>
         </div>
