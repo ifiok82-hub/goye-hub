@@ -370,6 +370,80 @@ export default function App() {
   const [documents, setDocuments] = useState<GoyeDocument[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
 
+  // PWA Install Prompt State and Handlers
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [showInstallBanner, setShowInstallBanner] = useState(false);
+  const [isIOS, setIsIOS] = useState(false);
+  const [isStandalone, setIsStandalone] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      // 1. Standalone and iOS Checks
+      const standalone = window.matchMedia('(display-mode: standalone)').matches ||
+        (window.navigator as any).standalone === true;
+      setIsStandalone(standalone);
+
+      const userAgent = window.navigator.userAgent.toLowerCase();
+      const isIOSDevice = /iphone|ipad|ipod/.test(userAgent);
+      setIsIOS(isIOSDevice);
+
+      // 2. Service Worker Registration
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then(reg => console.log('PWA SW registered with scope: ', reg.scope))
+            .catch(err => console.log('PWA SW registration failed: ', err));
+        });
+      }
+
+      // 3. beforeinstallprompt Event Listener
+      const handleBeforeInstallPrompt = (e: Event) => {
+        e.preventDefault();
+        setDeferredPrompt(e);
+
+        const dismissed = sessionStorage.getItem('goye_pwa_banner_dismissed');
+        if (!dismissed && !standalone) {
+          setTimeout(() => {
+            setShowInstallBanner(true);
+          }, 3000);
+        }
+      };
+
+      window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+      // 4. iOS manual trigger after 3s if not standalone
+      if (isIOSDevice && !standalone) {
+        const dismissed = sessionStorage.getItem('goye_pwa_banner_dismissed');
+        if (!dismissed) {
+          setTimeout(() => {
+            setShowInstallBanner(true);
+          }, 3000);
+        }
+      }
+
+      return () => {
+        window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      };
+    }
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (deferredPrompt) {
+      await deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        console.log('User accepted the PWA install option');
+        setDeferredPrompt(null);
+        setShowInstallBanner(false);
+      }
+    }
+  };
+
+  const dismissInstallBanner = () => {
+    setShowInstallBanner(false);
+    sessionStorage.setItem('goye_pwa_banner_dismissed', 'true');
+  };
+
   const [adminToken, setAdminToken] = useState<string | null>(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('goye_admin_token');
@@ -983,6 +1057,46 @@ export default function App() {
             piConfig={piConfig}
             currentUser={currentUser}
           />
+        )}
+      </AnimatePresence>
+
+      {/* PWA Install Banner */}
+      <AnimatePresence>
+        {showInstallBanner && (
+          <motion.div
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 50 }}
+            className="fixed bottom-6 left-6 right-6 md:left-auto md:w-[420px] z-[99999] bg-slate-900 border border-yellow-500/30 text-white rounded-3xl p-5 shadow-2xl flex flex-col md:flex-row items-center justify-between gap-4"
+          >
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">📲</span>
+              <div className="text-left">
+                <h4 className="text-xs font-black uppercase tracking-wider text-[#FFD700]">Install GOYE HUB App</h4>
+                <p className="text-[10px] text-gray-300 font-bold uppercase tracking-wide">
+                  {isIOS 
+                    ? "On iPhone: Tap Share → Add to Home Screen to install GOYE HUB" 
+                    : "Add to home screen for standalone mobile access"}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              {!isIOS && deferredPrompt && (
+                <button
+                  onClick={handleInstallClick}
+                  className="bg-[#FFD700] hover:bg-yellow-400 text-black px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors shadow-md cursor-pointer"
+                >
+                  Install
+                </button>
+              )}
+              <button
+                onClick={dismissInstallBanner}
+                className="bg-white/10 hover:bg-white/20 text-white px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors cursor-pointer"
+              >
+                Dismiss
+              </button>
+            </div>
+          </motion.div>
         )}
       </AnimatePresence>
 

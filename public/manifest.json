@@ -1,0 +1,30 @@
+{
+  "name": "GOYE SERVICES HUB — Build • Register • Automate & Scale",
+  "short_name": "GOYE HUB",
+  "description": "CAC Business Registration, Website Development, AI WhatsApp Bots — Accepting Pi, Paystack, Flutterwave, USDT, USDC",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#FFD700",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/goye_gold_logo_1790428812570.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    }
+  ]
+}
