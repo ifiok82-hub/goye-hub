@@ -426,6 +426,41 @@ export default function App() {
     if (savedPiConfig) setPiConfig(JSON.parse(savedPiConfig));
   }, []);
 
+  // Fetch and Sync user profile with the secure backend server
+  useEffect(() => {
+    if (currentUser && currentUser.id) {
+      fetch(`/api/user/profile?userId=${currentUser.id}`)
+        .then(res => {
+          if (res.ok) {
+            return res.json();
+          }
+          if (res.status === 404) {
+            return fetch(`/api/user/profile`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                id: currentUser.id,
+                name: currentUser.name,
+                email: currentUser.email,
+                phone: currentUser.phone,
+                role: currentUser.role
+              })
+            }).then(r => r.ok ? r.json().then(d => d.profile) : null);
+          }
+          return null;
+        })
+        .then(syncedProfile => {
+          if (syncedProfile) {
+            setCurrentUser(syncedProfile);
+            saveState('goye_user_profile', syncedProfile);
+          }
+        })
+        .catch(err => {
+          console.warn("[Profile Sync] Error syncing user profile with backend:", err);
+        });
+    }
+  }, [currentUser?.id]);
+
   // Save changes to localStorage helper
   const saveState = (key: string, data: any) => {
     localStorage.setItem(key, JSON.stringify(data));
@@ -746,7 +781,7 @@ export default function App() {
             setActiveCategoryFilter={setActiveCategoryFilter}
           />
         )}
-        {activeSection === 'dashboard' && <DashboardView currentUser={currentUser} onAuth={handleRegister} requests={requests} quotes={quotes} onPay={handlePaymentInitiated} supportTickets={supportTickets} setSupportTickets={setSupportTickets} documents={documents} setRequests={setRequests} isPiBrowser={isPiBrowser} onPiRegister={(p: any) => { setCurrentUser(p); saveState('goye_user_profile', p); logAction(p.name, 'User Registered via Pi SDK', p.id); }} />}
+        {activeSection === 'dashboard' && <DashboardView currentUser={currentUser} onAuth={handleRegister} onLogout={handleLogout} setCurrentUser={setCurrentUser} requests={requests} quotes={quotes} onPay={handlePaymentInitiated} supportTickets={supportTickets} setSupportTickets={setSupportTickets} documents={documents} setRequests={setRequests} isPiBrowser={isPiBrowser} onPiRegister={(p: any) => { setCurrentUser(p); saveState('goye_user_profile', p); logAction(p.name, 'User Registered via Pi SDK', p.id); }} />}
         {activeSection === 'admin' && <AdminView currentUser={currentUser} requests={requests} setRequests={setRequests} quotes={quotes} setQuotes={setQuotes} auditLogs={auditLogs} piConfig={piConfig} onUpdatePiConfig={handleUpdatePiConfig} />}
         {activeSection === 'faq' && <FaqView />}
         {activeSection === 'about' && <AboutView />}
@@ -1464,12 +1499,24 @@ function ServicesView({ selectedService, onSelect, currentUser, onAuth, onSubmit
 }
 
 // --- Dashboard View Component ---
-function DashboardView({ currentUser, onAuth, requests, quotes, onPay, supportTickets, setSupportTickets, documents, setRequests, isPiBrowser, onPiRegister }: { currentUser: UserProfile | null, onAuth: (n: string, e: string, p: string) => void, requests: ServiceRequest[], quotes: Quote[], onPay: (r: ServiceRequest | Quote) => void, supportTickets: SupportTicket[], setSupportTickets: any, documents: GoyeDocument[], setRequests: any, isPiBrowser?: boolean, onPiRegister?: (p: any) => void }) {
+function DashboardView({ currentUser, onAuth, onLogout, setCurrentUser, requests, quotes, onPay, supportTickets, setSupportTickets, documents, setRequests, isPiBrowser, onPiRegister }: { currentUser: UserProfile | null, onAuth: (n: string, e: string, p: string) => void, onLogout: () => void, setCurrentUser: (u: any) => void, requests: ServiceRequest[], quotes: Quote[], onPay: (r: ServiceRequest | Quote) => void, supportTickets: SupportTicket[], setSupportTickets: any, documents: GoyeDocument[], setRequests: any, isPiBrowser?: boolean, onPiRegister?: (p: any) => void }) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [ticketCategory, setTicketCategory] = useState('CAC Support');
   const [ticketMsg, setTicketMsg] = useState('');
+
+  const [editName, setEditName] = useState(currentUser?.name || '');
+  const [editEmail, setEditEmail] = useState(currentUser?.email || '');
+  const [editPhone, setEditPhone] = useState(currentUser?.phone || '');
+
+  useEffect(() => {
+    if (currentUser) {
+      setEditName(currentUser.name || '');
+      setEditEmail(currentUser.email || '');
+      setEditPhone(currentUser.phone || '');
+    }
+  }, [currentUser]);
 
   const handlePiAuthentication = () => {
     if (typeof window !== 'undefined' && (window as any).Pi && onPiRegister) {
@@ -1755,26 +1802,92 @@ function DashboardView({ currentUser, onAuth, requests, quotes, onPay, supportTi
           )}
 
           {activeTab === 'profile' && (
-            <div className="bg-white border border-gray-100 rounded-3xl p-8 shadow-sm space-y-6">
+            <div className="bg-white border border-gray-100 rounded-3xl p-8 shadow-sm space-y-6 text-left">
               <h3 className="text-xs font-black uppercase tracking-widest text-yellow-600">Client Profile Details</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs font-bold uppercase tracking-wider text-gray-500">
-                 <div>
-                   <p className="text-[9px] text-gray-400 block mb-1">Corporate Client Name</p>
-                   <p className="p-3 bg-slate-50 border border-gray-100 rounded-xl text-slate-900 font-black">{currentUser.name}</p>
-                 </div>
-                 <div>
-                   <p className="text-[9px] text-gray-400 block mb-1">Verified Email Address</p>
-                   <p className="p-3 bg-slate-50 border border-gray-100 rounded-xl text-slate-900 font-black">{currentUser.email}</p>
-                 </div>
-                 <div>
-                   <p className="text-[9px] text-gray-400 block mb-1">Corporate Coordinate (Phone)</p>
-                   <p className="p-3 bg-slate-50 border border-gray-100 rounded-xl text-slate-900 font-black">{currentUser.phone}</p>
-                 </div>
-                 <div>
-                   <p className="text-[9px] text-gray-400 block mb-1">Workspace Assignment Role</p>
-                   <p className="p-3 bg-slate-50 border border-gray-100 rounded-xl text-slate-900 font-black">{currentUser.role === 'admin' ? 'SYSTEM OWNER' : 'BUSINESS APPLICANT'}</p>
-                 </div>
-              </div>
+              <form onSubmit={async (e) => {
+                e.preventDefault();
+                try {
+                  const res = await fetch(`/api/user/profile`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      id: currentUser.id,
+                      name: editName,
+                      email: editEmail,
+                      phone: editPhone,
+                      role: currentUser.role
+                    })
+                  });
+                  if (res.ok) {
+                    const data = await res.json();
+                    setCurrentUser(data.profile);
+                    localStorage.setItem('goye_user_profile', JSON.stringify(data.profile));
+                    alert("Profile updated successfully on the secure server!");
+                  } else {
+                    alert("Failed to save profile changes to server.");
+                  }
+                } catch (err: any) {
+                  alert(`Network error saving profile: ${err.message}`);
+                }
+              }} className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs font-bold uppercase tracking-wider text-gray-500">
+                  <div>
+                    <label className="text-[9px] text-gray-400 block mb-1">Corporate Client Name</label>
+                    <input 
+                      type="text" 
+                      value={editName} 
+                      onChange={(e) => setEditName(e.target.value)}
+                      placeholder="Enter your full name" 
+                      className="w-full p-3 bg-slate-50 border border-gray-100 rounded-xl text-slate-900 font-bold focus:outline-none focus:border-yellow-500 transition-all uppercase tracking-wider text-xs"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[9px] text-gray-400 block mb-1">Verified Email Address</label>
+                    <input 
+                      type="email" 
+                      value={editEmail} 
+                      onChange={(e) => setEditEmail(e.target.value)}
+                      placeholder="Enter your email" 
+                      className="w-full p-3 bg-slate-50 border border-gray-100 rounded-xl text-slate-900 font-bold focus:outline-none focus:border-yellow-500 transition-all text-xs"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[9px] text-gray-400 block mb-1">Corporate Coordinate (Phone)</label>
+                    <input 
+                      type="tel" 
+                      value={editPhone} 
+                      onChange={(e) => setEditPhone(e.target.value)}
+                      placeholder="Enter your phone" 
+                      className="w-full p-3 bg-slate-50 border border-gray-100 rounded-xl text-slate-900 font-bold focus:outline-none focus:border-yellow-500 transition-all text-xs"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <span className="text-[9px] text-gray-400 block mb-1">Workspace Assignment Role</span>
+                    <p className="p-3 bg-slate-50 border border-gray-100 rounded-xl text-slate-900 font-black text-xs">
+                      {currentUser.role === 'admin' ? 'SYSTEM OWNER' : (currentUser.role ? currentUser.role.toUpperCase() : 'BUSINESS APPLICANT')}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex gap-4 pt-4">
+                  <button 
+                    type="submit" 
+                    className="bg-[#FFD700] hover:bg-yellow-400 text-black px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow"
+                  >
+                    Save Changes
+                  </button>
+                  <button 
+                    type="button" 
+                    onClick={onLogout}
+                    className="bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow"
+                  >
+                    Logout
+                  </button>
+                </div>
+              </form>
             </div>
           )}
 

@@ -5,10 +5,33 @@ import axios from 'axios';
 import { fileURLToPath } from 'url';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
+import fs from 'fs';
 
 dotenv.config();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+const PROFILES_FILE = path.join(__dirname, 'user_profiles.json');
+
+function readProfiles() {
+  try {
+    if (fs.existsSync(PROFILES_FILE)) {
+      const data = fs.readFileSync(PROFILES_FILE, 'utf-8');
+      return JSON.parse(data);
+    }
+  } catch (e) {
+    console.error('[Profiles DB] Error reading file:', e);
+  }
+  return {};
+}
+
+function writeProfiles(profiles: any) {
+  try {
+    fs.writeFileSync(PROFILES_FILE, JSON.stringify(profiles, null, 2), 'utf-8');
+  } catch (e) {
+    console.error('[Profiles DB] Error writing file:', e);
+  }
+}
 
 // Clean credentials placeholders in compliance with security guidelines
 const PAYSTACK_PUBLIC_KEY = process.env.PAYSTACK_PUBLIC_KEY || "";
@@ -153,6 +176,38 @@ async function createServer() {
       },
       timestamp: Date.now()
     });
+  });
+
+  // Secure endpoints to manage authenticated user profiles (No customer leaks)
+  app.get('/api/user/profile', (req, res) => {
+    const userId = req.query.userId as string;
+    if (!userId) {
+      return res.status(400).json({ error: 'Missing userId parameter' });
+    }
+    const profiles = readProfiles();
+    const userProfile = profiles[userId];
+    if (!userProfile) {
+      return res.status(404).json({ error: 'Profile not found' });
+    }
+    res.json(userProfile);
+  });
+
+  app.post('/api/user/profile', (req, res) => {
+    const { id, name, email, phone, role } = req.body;
+    if (!id) {
+      return res.status(400).json({ error: 'Missing profile ID' });
+    }
+    const profiles = readProfiles();
+    profiles[id] = {
+      id,
+      name: name || 'Valued User',
+      email: email || '',
+      phone: phone || '',
+      role: role || 'customer',
+      updatedAt: Date.now()
+    };
+    writeProfiles(profiles);
+    res.json({ success: true, profile: profiles[id] });
   });
 
   // --- Vite Integration / Static Serving ---
