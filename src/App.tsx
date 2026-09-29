@@ -338,6 +338,12 @@ export default function App() {
       if (window.location.pathname === '/terms' || window.location.pathname === '/terms-of-service' || window.location.pathname === '/pi-test') {
         return 'terms-of-service';
       }
+      if (window.location.pathname === '/admin') {
+        return 'admin';
+      }
+      if (window.location.pathname === '/my-account') {
+        return 'dashboard';
+      }
     }
     return 'home';
   });
@@ -350,6 +356,10 @@ export default function App() {
         window.history.pushState(null, '', '/terms');
       } else if (activeSection === 'home') {
         window.history.pushState(null, '', '/');
+      } else if (activeSection === 'admin') {
+        window.history.pushState(null, '', '/admin');
+      } else if (activeSection === 'dashboard') {
+        window.history.pushState(null, '', '/my-account');
       }
     }
   }, [activeSection]);
@@ -1023,7 +1033,7 @@ export default function App() {
         {activeSection === 'admin' && (
           isAdminVerified ? (
             <AdminView 
-              currentUser={currentUser} 
+              currentUser={(currentUser && currentUser.role === 'admin' ? currentUser : { name: 'Goye Owner', role: 'admin', id: 'admin_owner', email: 'owner@gasv.store', phone: '08000000000' }) as UserProfile} 
               requests={requests} 
               setRequests={setRequests} 
               quotes={quotes} 
@@ -1189,6 +1199,7 @@ export default function App() {
               <li className="hover:text-yellow-500 cursor-pointer" onClick={() => setActiveSection('faq')}>FAQ & Pricing</li>
               <li className="hover:text-yellow-500 cursor-pointer" onClick={() => setActiveSection('terms-of-service')}>Terms of Service</li>
               <li className="hover:text-yellow-500 cursor-pointer" onClick={() => setActiveSection('privacy-policy')}>Privacy Policy</li>
+              <li className="text-[10px] text-gray-700 hover:text-yellow-500 cursor-pointer pt-2" onClick={() => setActiveSection('admin')}>Admin Portal</li>
             </ul>
           </div>
         </div>
@@ -2362,7 +2373,7 @@ function AdminView({ currentUser, requests, setRequests, quotes, setQuotes, audi
         </button>
       </div>
 
-      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-8 mb-16">
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-8 mb-10">
         <div>
           <h2 className="text-3xl md:text-5xl font-black uppercase tracking-tighter mb-2 text-slate-900">Admin Control Hub</h2>
           <p className="text-gray-400 font-bold text-xs uppercase tracking-widest">Operations Platform</p>
@@ -2372,6 +2383,26 @@ function AdminView({ currentUser, requests, setRequests, quotes, setQuotes, audi
           <StatMini label="Paid Orders" value={requests.filter(r => r.status === 'PAYMENT VERIFIED' || r.status === 'COMPLETED').length} />
           <StatMini label="Pending Orders" value={requests.filter(r => r.status !== 'PAYMENT VERIFIED' && r.status !== 'COMPLETED').length} />
           <StatMini label="Total Revenue" value={`₦${requests.filter(r => r.status === 'PAYMENT VERIFIED' || r.status === 'COMPLETED').reduce((acc, r) => acc + r.amount, 0).toLocaleString()}`} />
+        </div>
+      </div>
+
+      {/* Explicit System Status Summary widgets */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-12">
+        <div className="p-5 bg-yellow-500/5 border border-yellow-500/15 rounded-3xl text-left">
+          <p className="text-[9px] font-black uppercase text-gray-400 tracking-wider mb-1">Total Orders</p>
+          <p className="text-2xl font-black text-slate-900">{requests.length}</p>
+        </div>
+        <div className="p-5 bg-neutral-950 border border-neutral-800 rounded-3xl text-left col-span-1 md:col-span-2">
+          <p className="text-[9px] font-black uppercase text-[#FFD700] tracking-wider mb-1">Pi Wallet Connection Status</p>
+          <p className="text-[10px] font-mono font-bold text-white break-all mb-1">GASU7HADLZKZE4A6EPRWW5QNMGHQBSL6FR3ED4N4ZR3KYDQRQXGQTJLX</p>
+          <span className="inline-block bg-emerald-500 text-white text-[8px] font-black tracking-widest px-2 py-0.5 rounded uppercase">✅ CONFIGURED</span>
+          <p className="text-[9px] text-red-500 font-bold uppercase mt-2">Mainnet (GBR4B47...VO6R): Isolated</p>
+        </div>
+        <div className="p-5 bg-slate-50 border border-gray-150 rounded-3xl text-left">
+          <p className="text-[9px] font-black uppercase text-gray-400 tracking-wider mb-1">Paystack Gateway Status</p>
+          <span className={`inline-block text-[9px] font-black tracking-widest px-2 py-0.5 rounded uppercase ${import.meta.env.VITE_PAYSTACK_PUBLIC_KEY ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}`}>
+            {import.meta.env.VITE_PAYSTACK_PUBLIC_KEY ? 'CONFIGURED' : 'NOT CONFIGURED'}
+          </span>
         </div>
       </div>
 
@@ -2624,7 +2655,7 @@ function AdminLoginScreen({ onLogin }: { onLogin: (password: string) => Promise<
     const res = await onLogin(password);
     setLoading(false);
     if (!res.success) {
-      setError(res.error || 'Invalid admin credentials');
+      setError('Invalid password');
     }
   };
 
@@ -2639,18 +2670,18 @@ function AdminLoginScreen({ onLogin }: { onLogin: (password: string) => Promise<
           <div className="p-4 bg-yellow-500/10 rounded-full border border-yellow-500/20 animate-pulse text-[#FFD700]">
             <Shield className="w-10 h-10" />
           </div>
-          <h2 className="text-sm font-black uppercase tracking-widest text-[#FFD700]">ADMIN MANAGEMENT</h2>
-          <p className="text-[10px] uppercase text-gray-500 tracking-wider font-bold">SECURE ACCESS AREA</p>
+          <h2 className="text-sm font-black uppercase tracking-widest text-[#FFD700]">🔒 ADMIN MANAGEMENT — SECURE ACCESS</h2>
+          <p className="text-[10px] uppercase text-gray-500 tracking-wider font-bold">GOYE SERVICES HUB Owner Only</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4 text-left">
           <div className="space-y-1">
-            <label className="text-[9px] uppercase tracking-wider text-gray-400 font-bold">Enter Shield Credentials</label>
+            <label className="text-[9px] uppercase tracking-wider text-gray-400 font-bold">Enter Admin Password</label>
             <input 
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••••••"
+              placeholder="Enter Admin Password"
               disabled={loading}
               className="w-full p-3 bg-neutral-900 border border-neutral-800 rounded-xl text-white font-mono focus:outline-none focus:border-[#FFD700] transition-all text-center tracking-widest text-sm"
               required
