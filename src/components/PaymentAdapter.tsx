@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { isPiBrowser } from '../utils/piDetection';
-import { Shield, CreditCard, Wallet, Copy, Check, ExternalLink, RefreshCw } from 'lucide-react';
+import { Shield, CreditCard, Wallet, Copy, Check, ExternalLink, RefreshCw, CheckCircle, Smartphone } from 'lucide-react';
 
 interface PaymentAdapterProps {
   item: {
@@ -18,24 +18,16 @@ interface PaymentAdapterProps {
 
 export function PaymentAdapter({ item, currentUser, onClose, onComplete, piConfig }: PaymentAdapterProps) {
   const [inPiBrowser, setInPiBrowser] = useState(false);
-  const [method, setMethod] = useState<'paystack' | 'flutterwave' | 'usdt' | 'usdc' | 'pi'>('paystack');
+  const [method, setMethod] = useState<'paystack' | 'flutterwave' | 'busha_usdt' | 'busha_usdc' | 'pi'>('paystack');
   const [txHash, setTxHash] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [bushaStatus, setBushaStatus] = useState<'IDLE' | 'PENDING' | 'VERIFIED'>('IDLE');
 
   const price = item.amount || item.total || 0;
   const piAmount = Number((price / 1000).toFixed(2));
   const isSandbox = piConfig?.networkMode === 'TESTNET';
-
-  const cryptoAmounts = {
-    usdt: Number((price / 1600).toFixed(2)),
-    usdc: Number((price / 1600).toFixed(2))
-  };
-
-  // Addresses from environment with standard fallback
-  const USDT_BEP20_ADDRESS = import.meta.env.VITE_USDT_BEP20_ADDRESS || "0x7a83d71249b6ef0289f68e9d6b58b3edd0957125";
-  const USDC_BASE_ADDRESS = import.meta.env.VITE_USDC_BASE_ADDRESS || "0x7a83d71249b6ef0289f68e9d6b58b3edd0957125";
 
   useEffect(() => {
     const detected = isPiBrowser();
@@ -69,8 +61,8 @@ export function PaymentAdapter({ item, currentUser, onClose, onComplete, piConfi
         (window as any).Pi.init({ version: "2.0", sandbox: isSandbox });
         (window as any).Pi.createPayment({
           amount: piAmount,
-          memo: `GOYE Escrow ${item.id} RC BN3583778`,
-          metadata: { dealId: item.id },
+          memo: `GOYE-HUB Escrow ${item.id} RC BN3583778`,
+          metadata: { dealId: item.id, platform: 'goye-hub' },
           paymentCallbacks: {
             onReadyForServerApproval: async (paymentId: string) => {
               try {
@@ -126,58 +118,39 @@ export function PaymentAdapter({ item, currentUser, onClose, onComplete, piConfi
     }
   };
 
-  const verifyUSDTBEP20 = async () => {
+  const handleBushaVerification = async (asset: 'USDT_BEP20' | 'USDC_BASE') => {
     if (!txHash.trim()) {
-      setPaymentError("Please provide your BEP20 transaction hash.");
+      setPaymentError("Please paste the transaction hash or transaction ID for verification.");
       return;
     }
     setPaymentError(null);
     setIsVerifying(true);
-    try {
-      const res = await fetch('/api/verify-bep20-tx', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ txHash: txHash.trim(), orderId: item.id })
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
-        setIsVerifying(false);
-        onComplete(txHash.trim(), 'USDT_BEP20');
-        alert("Transaction Receipt verified successfully on BNB Chain!");
-      } else {
-        setPaymentError(data.error || "Verification failed. Check the transaction hash on BscScan.");
-        setIsVerifying(false);
-      }
-    } catch (e: any) {
-      setPaymentError("Network error verifying transaction.");
-      setIsVerifying(false);
-    }
-  };
+    setBushaStatus('PENDING');
 
-  const verifyUSDCBase = async () => {
-    if (!txHash.trim()) {
-      setPaymentError("Please provide your Base transaction hash.");
-      return;
-    }
-    setPaymentError(null);
-    setIsVerifying(true);
     try {
-      const res = await fetch('/api/verify-base-tx', {
+      const res = await fetch('/api/verify-busha-tx', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ txHash: txHash.trim(), orderId: item.id })
+        body: JSON.stringify({
+          txHash: txHash.trim(),
+          asset,
+          dealId: item.id
+        })
       });
       const data = await res.json();
-      if (res.ok && data.success) {
+      if (res.ok && data.verified) {
+        setBushaStatus('VERIFIED');
         setIsVerifying(false);
-        onComplete(txHash.trim(), 'USDC_BASE');
-        alert("Transaction Receipt verified successfully on Base network!");
+        onComplete(txHash.trim(), `BUSHA_${asset}`);
+        alert(`Busha payment verified successfully on-chain! Status updated.`);
       } else {
-        setPaymentError(data.error || "Verification failed. Check the transaction hash on Basescan.");
+        setBushaStatus('IDLE');
+        setPaymentError(data.error || 'Transaction verification failed on blockchain. Please double check Tx Hash.');
         setIsVerifying(false);
       }
     } catch (e: any) {
-      setPaymentError("Network error verifying transaction.");
+      setBushaStatus('IDLE');
+      setPaymentError('Network failure checking Busha transaction.');
       setIsVerifying(false);
     }
   };
@@ -185,7 +158,7 @@ export function PaymentAdapter({ item, currentUser, onClose, onComplete, piConfi
   const handlePaystackPayment = async () => {
     const pubKey = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY;
     if (!pubKey) {
-      setPaymentError("Paystack is not configured. Please use crypto options.");
+      setPaymentError("Paystack is not configured. Please use Busha crypto options.");
       return;
     }
     setIsVerifying(true);
@@ -220,7 +193,7 @@ export function PaymentAdapter({ item, currentUser, onClose, onComplete, piConfi
   const handleFlutterwavePayment = async () => {
     const pubKey = import.meta.env.VITE_FLUTTERWAVE_PUBLIC_KEY;
     if (!pubKey) {
-      setPaymentError("Flutterwave is not configured. Please use crypto options.");
+      setPaymentError("Flutterwave is not configured. Please use Busha crypto options.");
       return;
     }
     setIsVerifying(true);
@@ -262,28 +235,30 @@ export function PaymentAdapter({ item, currentUser, onClose, onComplete, piConfi
   // -------------------------------------------------------------
   if (inPiBrowser) {
     return (
-      <div className="bg-black text-white p-6 rounded-3xl border border-yellow-500/20 max-w-md w-full space-y-6 text-center select-none">
+      <div className="bg-[#0A1931] text-white p-7 rounded-3xl border border-[#D4AF37]/30 max-w-md w-full space-y-6 text-center select-none shadow-2xl">
         <div className="flex flex-col items-center space-y-2">
-          <div className="p-3 bg-yellow-500/10 rounded-full border border-yellow-500/30 text-[#FFD700]">
-            <Shield size={36} />
+          <div className="p-3 bg-[#D4AF37]/10 rounded-full border border-[#D4AF37]/30 text-[#D4AF37]">
+            <Shield size={38} className="animate-pulse" />
           </div>
-          <h3 className="text-sm font-black tracking-widest text-[#FFD700] uppercase">Pi Portal Payment Secure</h3>
-          <p className="text-[10px] uppercase text-gray-500 tracking-wider font-bold">Pi-exclusive transaction — Secured on Pi Network</p>
+          <h3 className="text-base font-black tracking-widest text-[#D4AF37] uppercase">Pi Portal Active</h3>
+          <p className="text-[10px] uppercase text-[#D4AF37]/80 tracking-widest font-extrabold">
+            RC BN3583778 TRUSTED ESCROW
+          </p>
         </div>
 
-        <div className="p-4 bg-neutral-900 rounded-2xl border border-neutral-800 space-y-2 text-left">
+        <div className="p-5 bg-[#15305B] rounded-2xl border border-white/10 text-left space-y-3">
           <div className="flex justify-between items-center text-xs">
-            <span className="text-gray-400 font-bold uppercase">Escrow Item</span>
-            <span className="text-white font-black uppercase truncate max-w-[200px]">{item.serviceName}</span>
+            <span className="text-gray-300 font-bold uppercase">Contract Reference</span>
+            <span className="text-white font-black truncate max-w-[180px]">{item.serviceName}</span>
           </div>
           <div className="flex justify-between items-center text-xs">
-            <span className="text-gray-400 font-bold uppercase">Value</span>
-            <span className="text-[#FFD700] font-mono font-black">{piAmount.toLocaleString()} Pi</span>
+            <span className="text-gray-300 font-bold uppercase">Escrow Release Value</span>
+            <span className="text-[#D4AF37] font-mono font-black text-sm">{piAmount.toLocaleString()} Pi</span>
           </div>
         </div>
 
         {paymentError && (
-          <div className="p-3 bg-red-950/40 border border-red-500/20 rounded-xl text-red-400 text-[10px] font-black uppercase tracking-wider">
+          <div className="p-3 bg-red-950/50 border border-red-500/20 rounded-xl text-red-300 text-[10px] font-black uppercase tracking-wider">
             {paymentError}
           </div>
         )}
@@ -291,202 +266,204 @@ export function PaymentAdapter({ item, currentUser, onClose, onComplete, piConfi
         <button
           onClick={handlePiPayment}
           disabled={isVerifying}
-          className="w-full bg-[#FFD700] hover:bg-yellow-400 text-black py-4 rounded-xl font-black text-xs uppercase tracking-widest transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+          className="w-full bg-[#D4AF37] hover:bg-yellow-500 text-[#0A1931] py-4 rounded-xl font-black text-xs uppercase tracking-widest transition-all shadow-lg hover:shadow-[#D4AF37]/20 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
         >
           {isVerifying ? (
             <>
-              <RefreshCw className="w-4 h-4 animate-spin" /> VERIFYING BLOCKCHAIN...
+              <RefreshCw className="w-4 h-4 animate-spin" /> PROVISIONING CORES...
             </>
           ) : (
             `PAY ${piAmount} PI SECURE`
           )}
         </button>
 
-        <p className="text-[9px] text-gray-600 font-bold uppercase">
-          🛡️ Funds are securely locked in escrow and released only upon delivery verification.
-        </p>
+        <div className="pt-2">
+          <span className="text-[9px] text-[#D4AF37] bg-[#15305B] px-3 py-1.5 rounded-full border border-[#D4AF37]/20 font-black tracking-widest uppercase">
+            Pi-exclusive transaction — Secured on Pi Network — RC BN3583778
+          </span>
+        </div>
       </div>
     );
   }
 
   // -------------------------------------------------------------
-  // STANDARD BROWSER (CHROME/SAFARI/EDGE) VIEW
+  // STANDARD BROWSER VIEW (Navy, Gold, White Cards, Pi purple accents)
   // -------------------------------------------------------------
   return (
-    <div className="bg-black text-white p-6 rounded-3xl border border-yellow-500/10 max-w-md w-full space-y-6 text-center">
+    <div className="bg-[#0A1931] text-white p-6 rounded-3xl border border-[#D4AF37]/20 max-w-md w-full space-y-6 text-center shadow-2xl select-none">
       <div className="flex flex-col items-center space-y-2">
-        <div className="p-3 bg-yellow-500/5 rounded-full border border-yellow-500/20 text-[#FFD700]">
-          <CreditCard size={28} />
+        <div className="p-3.5 bg-white/5 rounded-full border border-[#D4AF37]/20 text-[#D4AF37]">
+          <Smartphone size={28} />
         </div>
-        <h3 className="text-sm font-black tracking-widest text-[#FFD700] uppercase">Select Payment Channel</h3>
-        <p className="text-[9px] uppercase text-gray-500 tracking-wider font-bold">Multiple payment gateways & cryptocurrency options</p>
+        <h3 className="text-sm font-black tracking-widest text-[#D4AF37] uppercase">Corporate Check-out</h3>
+        <span className="text-[9px] uppercase tracking-wider text-white bg-purple-600/20 px-2.5 py-1 rounded-full border border-purple-500/30 font-bold">
+          Pi purple Escrow Verified ➔ RC BN3583778
+        </span>
       </div>
 
-      {/* Payment methods selector */}
-      <div className="grid grid-cols-5 gap-1.5 p-1 bg-neutral-900 rounded-xl border border-neutral-800">
-        {(['paystack', 'flutterwave', 'usdt', 'usdc', 'pi'] as const).map((m) => (
+      {/* Gateway selector tabs */}
+      <div className="grid grid-cols-5 gap-1 p-1 bg-[#15305B] rounded-xl border border-white/5">
+        {(['paystack', 'flutterwave', 'busha_usdt', 'busha_usdc', 'pi'] as const).map((m) => (
           <button
             key={m}
             onClick={() => {
               setMethod(m);
               setPaymentError(null);
+              setBushaStatus('IDLE');
             }}
-            className={`py-2 rounded-lg font-black text-[8px] uppercase tracking-wider transition-all cursor-pointer ${
-              method === m ? 'bg-[#FFD700] text-black shadow font-black' : 'text-gray-400 hover:text-white'
+            className={`py-2 rounded-lg font-black text-[7.5px] uppercase tracking-tight transition-all cursor-pointer ${
+              method === m 
+                ? 'bg-[#D4AF37] text-[#0A1931] shadow-md font-black' 
+                : 'text-gray-300 hover:text-white hover:bg-white/5'
             }`}
           >
-            {m === 'pi' ? 'Pi Network' : m}
+            {m === 'busha_usdt' ? 'Busha USDT' : m === 'busha_usdc' ? 'Busha USDC' : m === 'pi' ? 'Pi Network' : m}
           </button>
         ))}
       </div>
 
-      <div className="p-5 bg-neutral-900/60 rounded-2xl border border-neutral-800 text-left space-y-4">
+      {/* White Content Card (Design instructions: white cards) */}
+      <div className="p-5 bg-white text-slate-900 rounded-2xl text-left space-y-4 shadow-xl border border-gray-100">
+        <div className="border-b border-gray-100 pb-3 flex justify-between items-center">
+          <span className="text-[9px] font-black uppercase text-gray-400">Total Price</span>
+          <span className="text-base font-black text-[#0A1931]">₦{price.toLocaleString()}</span>
+        </div>
+
         {method === 'pi' && (
           <div className="space-y-4 text-center">
-            <p className="text-[10px] text-yellow-500 font-black uppercase">💡 Pi Browser recommended</p>
-            <p className="text-xs text-gray-400 leading-relaxed font-bold">
-              Please open this app inside the official **Pi Browser** to pay directly using the native Pi blockchain checkout module.
+            <p className="text-[10px] text-purple-700 font-extrabold uppercase tracking-wider">💜 PI PORTAL ROUTING ACTIVE</p>
+            <p className="text-xs text-slate-500 font-medium leading-relaxed uppercase tracking-wider text-center">
+              Please open this hub inside the official **Pi Browser** to pay directly using the native Pi blockchain checkout module.
             </p>
             <button
               onClick={handlePiPayment}
               disabled={isVerifying}
-              className="w-full bg-yellow-600/20 hover:bg-yellow-600/30 text-[#FFD700] border border-yellow-500/30 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest cursor-pointer"
+              className="w-full bg-purple-600 hover:bg-purple-700 text-white py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all cursor-pointer shadow-md"
             >
-              TRY PI CHECKOUT ANYWAY
+              RUN PI OVERLAY ANYWAY
             </button>
           </div>
         )}
 
         {method === 'paystack' && (
           <div className="space-y-3">
-            <p className="text-[10px] text-gray-400 font-black uppercase">⚡ Secure card and bank transfer</p>
+            <p className="text-[9px] text-gray-400 font-black uppercase">💳 Card or Transfer via Paystack</p>
             <button
               onClick={handlePaystackPayment}
               disabled={isVerifying}
-              className="w-full bg-[#FFD700] hover:bg-yellow-400 text-black py-3 rounded-xl font-black text-xs uppercase tracking-widest shadow cursor-pointer disabled:opacity-50"
+              className="w-full bg-[#0A1931] hover:bg-[#15305B] text-white py-3 rounded-xl font-black text-xs uppercase tracking-widest shadow-md transition-colors cursor-pointer disabled:opacity-50"
             >
-              {isVerifying ? 'VERIFYING...' : `PAY ₦${price.toLocaleString()} WITH PAYSTACK`}
+              {isVerifying ? 'LOADING PAYSTACK...' : 'INITIATE PAYSTACK PAYMENT'}
             </button>
           </div>
         )}
 
         {method === 'flutterwave' && (
           <div className="space-y-3">
-            <p className="text-[10px] text-gray-400 font-black uppercase">💳 Web3 & Local Bank Rails</p>
+            <p className="text-[9px] text-gray-400 font-black uppercase">🛡️ Escrow Channel via Flutterwave</p>
             <button
               onClick={handleFlutterwavePayment}
               disabled={isVerifying}
-              className="w-full bg-[#FFD700] hover:bg-yellow-400 text-black py-3 rounded-xl font-black text-xs uppercase tracking-widest shadow cursor-pointer disabled:opacity-50"
+              className="w-full bg-[#0A1931] hover:bg-[#15305B] text-white py-3 rounded-xl font-black text-xs uppercase tracking-widest shadow-md transition-colors cursor-pointer disabled:opacity-50"
             >
-              {isVerifying ? 'VERIFYING...' : `PAY ₦${price.toLocaleString()} WITH FLUTTERWAVE`}
+              {isVerifying ? 'LOADING FLUTTERWAVE...' : 'INITIATE FLUTTERWAVE PAYMENT'}
             </button>
           </div>
         )}
 
-        {method === 'usdt' && (
-          <div className="space-y-4">
-            <div className="flex justify-between items-center">
-              <span className="text-[9px] font-black uppercase text-gray-400">USDT RECEIVER (BSC BEP20)</span>
-              <span className="text-[10px] font-mono text-[#FFD700] font-black">{cryptoAmounts.usdt} USDT</span>
+        {method === 'busha_usdt' && (
+          <div className="space-y-4 text-slate-700 text-xs leading-relaxed font-semibold">
+            <div className="bg-[#0A1931]/5 p-3 rounded-xl border border-[#0A1931]/10 text-[#0A1931] text-[10px] font-black uppercase tracking-wider text-center">
+              💸 Pay with USDT BEP20 via Busha
             </div>
             
-            <div className="flex flex-col items-center space-y-3 p-3 bg-black rounded-xl border border-neutral-800">
-              {/* Fallback mock QR code representation */}
-              <div className="w-32 h-32 bg-white rounded-lg flex items-center justify-center border border-gray-200">
-                <img src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${USDT_BEP20_ADDRESS}`} alt="USDT BEP20 Address QR" className="w-28 h-28" />
-              </div>
-              <div className="flex items-center justify-between w-full p-2 bg-neutral-900 rounded border border-neutral-800 text-[10px] font-mono text-gray-300">
-                <span className="truncate max-w-[240px]">{USDT_BEP20_ADDRESS}</span>
-                <button onClick={() => handleCopy(USDT_BEP20_ADDRESS)} className="p-1 hover:text-white transition-all">
-                  {copied ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
-                </button>
-              </div>
+            <div className="space-y-2 text-[10px] uppercase text-slate-500 font-extrabold tracking-wider">
+              <p>1. Open your corporate Busha app on your smartphone</p>
+              <p>2. Tap the **Receive** button inside the asset card</p>
+              <p>3. Select **USDT** and choose the **BEP20 (BSC)** network option</p>
+              <p>4. Send exact corresponding amount to your wallet address</p>
+              <p>5. Paste the Busha Transaction Hash or ID here for audit</p>
             </div>
 
-            <div className="flex justify-between items-center text-[9px] font-black uppercase text-gray-400">
-              <span>BSC CHAIN ID: 56</span>
-              <a href={`https://bscscan.com/address/${USDT_BEP20_ADDRESS}`} target="_blank" rel="noopener noreferrer" className="text-[#FFD700] hover:underline flex items-center gap-1">
-                VIEW ON BSCSCAN <ExternalLink size={10} />
-              </a>
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-[9px] uppercase tracking-wider text-gray-400 font-bold block">Enter transaction hash (Tx Hash)</label>
+            <div className="pt-2 space-y-1.5 text-left">
+              <label className="text-[9px] uppercase tracking-wider text-[#0A1931] font-black">Transaction Hash / TxID</label>
               <input
                 type="text"
-                placeholder="0x..."
+                placeholder="Paste Busha blockchain TxID here"
                 value={txHash}
                 onChange={(e) => setTxHash(e.target.value)}
-                className="w-full p-2.5 bg-neutral-950 border border-neutral-800 rounded-lg text-white font-mono focus:outline-none focus:border-[#FFD700] text-xs uppercase"
+                className="w-full p-2.5 bg-slate-50 border border-gray-200 rounded-lg text-slate-900 font-mono text-xs focus:outline-none focus:border-[#D4AF37] uppercase font-bold"
               />
             </div>
 
+            <div className="flex justify-between items-center text-[9px] font-black uppercase pt-1">
+              <span>Busha Status:</span>
+              <span className={`px-2 py-0.5 rounded ${bushaStatus === 'VERIFIED' ? 'bg-emerald-100 text-emerald-800' : 'bg-orange-100 text-orange-800'}`}>
+                {bushaStatus} VIA BUSHA
+              </span>
+            </div>
+
             <button
-              onClick={verifyUSDTBEP20}
+              onClick={() => handleBushaVerification('USDT_BEP20')}
               disabled={isVerifying}
-              className="w-full bg-[#FFD700] hover:bg-yellow-400 text-black py-3 rounded-xl font-black text-xs uppercase tracking-widest shadow cursor-pointer disabled:opacity-50"
+              className="w-full bg-[#0A1931] hover:bg-[#15305B] text-white py-3 rounded-xl font-black text-xs uppercase tracking-widest shadow cursor-pointer disabled:opacity-50"
             >
-              {isVerifying ? 'VERIFYING TRANSACTION...' : 'VERIFY BLOCKCHAIN RECEIPT'}
+              {isVerifying ? 'VERIFYING TRANSACT...' : 'VERIFY BUSHA TRANSACTION'}
             </button>
           </div>
         )}
 
-        {method === 'usdc' && (
-          <div className="space-y-4">
-            <div className="flex justify-between items-center">
-              <span className="text-[9px] font-black uppercase text-gray-400">USDC RECEIVER (BASE MAINNET)</span>
-              <span className="text-[10px] font-mono text-[#FFD700] font-black">{cryptoAmounts.usdc} USDC</span>
+        {method === 'busha_usdc' && (
+          <div className="space-y-4 text-slate-700 text-xs leading-relaxed font-semibold">
+            <div className="bg-[#0A1931]/5 p-3 rounded-xl border border-[#0A1931]/10 text-[#0A1931] text-[10px] font-black uppercase tracking-wider text-center">
+              💸 Pay with USDC Base via Busha
             </div>
 
-            <div className="flex flex-col items-center space-y-3 p-3 bg-black rounded-xl border border-neutral-800">
-              <div className="w-32 h-32 bg-white rounded-lg flex items-center justify-center border border-gray-200">
-                <img src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${USDC_BASE_ADDRESS}`} alt="USDC BASE Address QR" className="w-28 h-28" />
-              </div>
-              <div className="flex items-center justify-between w-full p-2 bg-neutral-900 rounded border border-neutral-800 text-[10px] font-mono text-gray-300">
-                <span className="truncate max-w-[240px]">{USDC_BASE_ADDRESS}</span>
-                <button onClick={() => handleCopy(USDC_BASE_ADDRESS)} className="p-1 hover:text-white transition-all">
-                  {copied ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
-                </button>
-              </div>
+            <div className="space-y-2 text-[10px] uppercase text-slate-500 font-extrabold tracking-wider">
+              <p>1. Open your Busha app on your phone</p>
+              <p>2. Choose **Receive** ➔ select **USDC**</p>
+              <p>3. Choose **Base Network** for lowest fees</p>
+              <p>4. Complete the transfer inside your Busha profile</p>
+              <p>5. Copy and paste the Transaction Receipt Hash below</p>
             </div>
 
-            <div className="flex justify-between items-center text-[9px] font-black uppercase text-gray-400">
-              <span>BASE CHAIN ID: 8453</span>
-              <a href={`https://basescan.org/address/${USDC_BASE_ADDRESS}`} target="_blank" rel="noopener noreferrer" className="text-[#FFD700] hover:underline flex items-center gap-1">
-                VIEW ON BASESCAN <ExternalLink size={10} />
-              </a>
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-[9px] uppercase tracking-wider text-gray-400 font-bold block">Enter transaction hash (Tx Hash)</label>
+            <div className="pt-2 space-y-1.5 text-left">
+              <label className="text-[9px] uppercase tracking-wider text-[#0A1931] font-black">Transaction Hash / TxID</label>
               <input
                 type="text"
-                placeholder="0x..."
+                placeholder="Paste Busha blockchain TxID here"
                 value={txHash}
                 onChange={(e) => setTxHash(e.target.value)}
-                className="w-full p-2.5 bg-neutral-950 border border-neutral-800 rounded-lg text-white font-mono focus:outline-none focus:border-[#FFD700] text-xs uppercase"
+                className="w-full p-2.5 bg-slate-50 border border-gray-200 rounded-lg text-slate-900 font-mono text-xs focus:outline-none focus:border-[#D4AF37] uppercase font-bold"
               />
             </div>
 
+            <div className="flex justify-between items-center text-[9px] font-black uppercase pt-1">
+              <span>Busha Status:</span>
+              <span className={`px-2 py-0.5 rounded ${bushaStatus === 'VERIFIED' ? 'bg-emerald-100 text-emerald-800' : 'bg-orange-100 text-orange-800'}`}>
+                {bushaStatus} VIA BUSHA
+              </span>
+            </div>
+
             <button
-              onClick={verifyUSDCBase}
+              onClick={() => handleBushaVerification('USDC_BASE')}
               disabled={isVerifying}
-              className="w-full bg-[#FFD700] hover:bg-yellow-400 text-black py-3 rounded-xl font-black text-xs uppercase tracking-widest shadow cursor-pointer disabled:opacity-50"
+              className="w-full bg-[#0A1931] hover:bg-[#15305B] text-white py-3 rounded-xl font-black text-xs uppercase tracking-widest shadow cursor-pointer disabled:opacity-50"
             >
-              {isVerifying ? 'VERIFYING TRANSACTION...' : 'VERIFY BLOCKCHAIN RECEIPT'}
+              {isVerifying ? 'VERIFYING TRANSACT...' : 'VERIFY BUSHA TRANSACTION'}
             </button>
           </div>
         )}
       </div>
 
       {paymentError && (
-        <div className="p-3 bg-red-950/40 border border-red-500/20 rounded-xl text-red-400 text-[10px] font-black uppercase tracking-wider text-center">
+        <div className="p-3 bg-red-950/40 border border-red-500/20 rounded-xl text-red-300 text-[9px] font-black uppercase tracking-wider">
           {paymentError}
         </div>
       )}
 
-      <p className="text-[8px] text-gray-600 font-bold uppercase leading-relaxed">
-        🔐 All payments run on top-tier secure rails. Escrow remains held until project delivery is authoritatively verified.
+      <p className="text-[8px] text-gray-400 font-bold uppercase leading-relaxed">
+        🛡️ Escrow funds held securely inside GOYE HUB and released strictly upon delivery confirmation. RC BN3583778.
       </p>
     </div>
   );
