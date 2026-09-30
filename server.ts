@@ -346,6 +346,62 @@ async function createServer() {
     }
   });
 
+  // Verify BEP20 USDT (BSC Chain ID 56)
+  app.post('/api/verify-bep20-tx', async (req, res) => {
+    const { txHash, orderId } = req.body;
+    if (!txHash) {
+      return res.status(400).json({ success: false, error: 'Transaction Hash (txHash) is required' });
+    }
+    try {
+      const rpcResponse = await axios.post('https://bsc-dataseed.binance.org/', {
+        jsonrpc: '2.0',
+        method: 'eth_getTransactionReceipt',
+        params: [txHash],
+        id: 56
+      });
+      const receipt = rpcResponse.data?.result;
+      if (!receipt) {
+        return res.status(400).json({ success: false, error: 'Transaction receipt not found. Check if txHash is correct.' });
+      }
+      if (receipt.status !== '0x1') {
+        return res.status(400).json({ success: false, error: 'Transaction has failed on-chain.' });
+      }
+      console.log(`Verified BEP20 USDT transaction: ${txHash} for order: ${orderId}`);
+      res.json({ success: true, message: 'BEP20 USDT Payment Verified Successfully', receipt });
+    } catch (err: any) {
+      console.error("USDT verification error:", err.message);
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // Verify Base USDC (Base Chain ID 8453)
+  app.post('/api/verify-base-tx', async (req, res) => {
+    const { txHash, orderId } = req.body;
+    if (!txHash) {
+      return res.status(400).json({ success: false, error: 'Transaction Hash (txHash) is required' });
+    }
+    try {
+      const rpcResponse = await axios.post('https://mainnet.base.org/', {
+        jsonrpc: '2.0',
+        method: 'eth_getTransactionReceipt',
+        params: [txHash],
+        id: 8453
+      });
+      const receipt = rpcResponse.data?.result;
+      if (!receipt) {
+        return res.status(400).json({ success: false, error: 'Transaction receipt not found. Check if txHash is correct.' });
+      }
+      if (receipt.status !== '0x1') {
+        return res.status(400).json({ success: false, error: 'Transaction has failed on-chain.' });
+      }
+      console.log(`Verified Base USDC transaction: ${txHash} for order: ${orderId}`);
+      res.json({ success: true, message: 'Base USDC Payment Verified Successfully', receipt });
+    } catch (err: any) {
+      console.error("USDC verification error:", err.message);
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
   // Secure endpoints to manage authenticated user profiles (No customer leaks)
   app.get('/api/user/profile', (req, res) => {
     const userId = req.query.userId as string;

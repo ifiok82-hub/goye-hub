@@ -33,6 +33,7 @@ import {
   SmartphoneNfc
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { PaymentAdapter } from './components/PaymentAdapter';
 
 // --- Assets ---
 const ASSETS = {
@@ -2734,6 +2735,26 @@ function AdminLoginScreen({ onLogin }: { onLogin: (password: string) => Promise<
 
 // --- Checkout View ---
 function CheckoutModal({ item, isPiBrowser, onClose, onComplete, piConfig, currentUser }: { item: ServiceRequest | Quote, isPiBrowser: boolean, onClose: () => void, onComplete: (ref: string, provider: string) => void, piConfig: any, currentUser: UserProfile | null }) {
+  return (
+    <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-[4px]" onClick={onClose} />
+      <div className="relative bg-black border border-yellow-500/20 rounded-3xl w-full max-w-md p-1 shadow-2xl overflow-hidden">
+        <button onClick={onClose} className="absolute top-4 right-4 z-[1001] p-1.5 text-gray-400 hover:text-white transition-colors bg-neutral-900/50 rounded-full">
+          <X size={18} />
+        </button>
+        <PaymentAdapter
+          item={item}
+          currentUser={currentUser}
+          onClose={onClose}
+          onComplete={onComplete}
+          piConfig={piConfig}
+        />
+      </div>
+    </div>
+  );
+}
+
+function LegacyCheckoutModal_Disabled({ item, isPiBrowser, onClose, onComplete, piConfig, currentUser }: { item: ServiceRequest | Quote, isPiBrowser: boolean, onClose: () => void, onComplete: (ref: string, provider: string) => void, piConfig: any, currentUser: UserProfile | null }) {
   const [method, setMethod] = useState<'paystack' | 'flutterwave' | 'usdt' | 'usdc' | 'pi'>(isPiBrowser ? 'pi' : 'paystack');
   const [isVerifying, setIsVerifying] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
