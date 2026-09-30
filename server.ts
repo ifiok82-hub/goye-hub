@@ -8,6 +8,7 @@ import { createServer as createViteServer } from 'vite';
 import fs from 'fs';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import { getCollection, getDocument, setDocument, deleteDocument, isDatabaseConfigured } from './server-db.js';
 
 dotenv.config();
 
@@ -255,8 +256,10 @@ async function createServer() {
 
   // Secure API Route to pull System Health metrics without exposing keys
   app.get('/api/health', (req, res) => {
+    const isDbReady = isDatabaseConfigured();
     res.json({
       status: 'CONNECTED',
+      DATABASE_STATUS: isDbReady ? 'PRODUCTION CONFIGURED' : 'DATABASE: NOT PRODUCTION CONFIGURED warning',
       PI_API_KEY: PI_API_KEY ? 'CONFIGURED' : 'NOT CONFIGURED',
       PAYSTACK_SECRET_KEY: PAYSTACK_SECRET_KEY ? 'CONFIGURED' : 'NOT CONFIGURED',
       FLUTTERWAVE_SECRET_KEY: FLUTTERWAVE_SECRET_KEY ? 'CONFIGURED' : 'NOT CONFIGURED',
@@ -281,6 +284,66 @@ async function createServer() {
       },
       timestamp: Date.now()
     });
+  });
+
+  // Dynamic REST endpoints for contracts, deals, invoices, and users
+  const COLLECTIONS = ['contracts', 'deals', 'invoices', 'users'];
+
+  app.get('/api/:collection', async (req, res) => {
+    const { collection } = req.params;
+    if (!COLLECTIONS.includes(collection)) {
+      return res.status(404).json({ error: 'Collection not found' });
+    }
+    try {
+      const items = await getCollection(collection);
+      res.json(items);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.get('/api/:collection/:id', async (req, res) => {
+    const { collection, id } = req.params;
+    if (!COLLECTIONS.includes(collection)) {
+      return res.status(404).json({ error: 'Collection not found' });
+    }
+    try {
+      const item = await getDocument(collection, id);
+      if (!item) return res.status(404).json({ error: 'Document not found' });
+      res.json(item);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.post('/api/:collection', async (req, res) => {
+    const { collection } = req.params;
+    const { id, ...data } = req.body;
+    if (!COLLECTIONS.includes(collection)) {
+      return res.status(404).json({ error: 'Collection not found' });
+    }
+    if (!id) {
+      return res.status(400).json({ error: 'Document ID (id) is required in request body' });
+    }
+    try {
+      await setDocument(collection, id, { id, ...data });
+      res.json({ success: true, id });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.delete('/api/:collection/:id', async (req, res) => {
+    const { collection, id } = req.params;
+    if (!COLLECTIONS.includes(collection)) {
+      return res.status(404).json({ error: 'Collection not found' });
+    }
+    try {
+      await deleteDocument(collection, id);
+      res.json({ success: true });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
   });
 
   // Secure endpoints to manage authenticated user profiles (No customer leaks)
