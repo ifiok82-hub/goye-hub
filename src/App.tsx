@@ -363,6 +363,27 @@ export default function App() {
       }
     }
   }, [activeSection]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const handlePopState = () => {
+        const path = window.location.pathname;
+        if (path === '/privacy-policy') {
+          setActiveSection('privacy-policy');
+        } else if (path === '/terms' || path === '/terms-of-service') {
+          setActiveSection('terms-of-service');
+        } else if (path === '/admin') {
+          setActiveSection('admin');
+        } else if (path === '/my-account') {
+          setActiveSection('dashboard');
+        } else {
+          setActiveSection('home');
+        }
+      };
+      window.addEventListener('popstate', handlePopState);
+      return () => window.removeEventListener('popstate', handlePopState);
+    }
+  }, []);
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [activeCategoryFilter, setActiveCategoryFilter] = useState<string>('ALL');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
