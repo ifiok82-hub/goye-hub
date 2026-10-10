@@ -330,59 +330,95 @@ const SERVICES_CATALOG: Service[] = [
   }
 ];
 
+// Robust safe storage helper to prevent iframe/sandboxed crashes
+const safeStorage = {
+  get: (storage: 'local' | 'session', key: string): string | null => {
+    try {
+      if (typeof window === 'undefined') return null;
+      return storage === 'local' ? window.localStorage?.getItem(key) : window.sessionStorage?.getItem(key);
+    } catch {
+      return null;
+    }
+  },
+  set: (storage: 'local' | 'session', key: string, val: string) => {
+    try {
+      if (typeof window === 'undefined') return;
+      if (storage === 'local') window.localStorage?.setItem(key, val);
+      else window.sessionStorage?.setItem(key, val);
+    } catch {}
+  },
+  remove: (storage: 'local' | 'session', key: string) => {
+    try {
+      if (typeof window === 'undefined') return;
+      if (storage === 'local') window.localStorage?.removeItem(key);
+      else window.sessionStorage?.removeItem(key);
+    } catch {}
+  }
+};
+
 export default function App() {
   const [activeSection, setActiveSection] = useState<Section>(() => {
     if (typeof window !== 'undefined') {
-      if (window.location.pathname === '/privacy-policy') {
-        return 'privacy-policy';
-      }
-      if (window.location.pathname === '/terms' || window.location.pathname === '/terms-of-service' || window.location.pathname === '/pi-test') {
-        return 'terms-of-service';
-      }
-      if (window.location.pathname === '/admin') {
-        return 'admin';
-      }
-      if (window.location.pathname === '/my-account') {
-        return 'dashboard';
-      }
+      try {
+        if (window.location.pathname === '/privacy-policy') {
+          return 'privacy-policy';
+        }
+        if (window.location.pathname === '/terms' || window.location.pathname === '/terms-of-service' || window.location.pathname === '/pi-test') {
+          return 'terms-of-service';
+        }
+        if (window.location.pathname === '/admin') {
+          return 'admin';
+        }
+        if (window.location.pathname === '/my-account') {
+          return 'dashboard';
+        }
+      } catch (e) {}
     }
     return 'home';
   });
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      if (activeSection === 'privacy-policy') {
-        window.history.pushState(null, '', '/privacy-policy');
-      } else if (activeSection === 'terms-of-service') {
-        window.history.pushState(null, '', '/terms');
-      } else if (activeSection === 'home') {
-        window.history.pushState(null, '', '/');
-      } else if (activeSection === 'admin') {
-        window.history.pushState(null, '', '/admin');
-      } else if (activeSection === 'dashboard') {
-        window.history.pushState(null, '', '/my-account');
+      try {
+        if (activeSection === 'privacy-policy') {
+          window.history.pushState(null, '', '/privacy-policy');
+        } else if (activeSection === 'terms-of-service') {
+          window.history.pushState(null, '', '/terms');
+        } else if (activeSection === 'home') {
+          window.history.pushState(null, '', '/');
+        } else if (activeSection === 'admin') {
+          window.history.pushState(null, '', '/admin');
+        } else if (activeSection === 'dashboard') {
+          window.history.pushState(null, '', '/my-account');
+        }
+      } catch (e) {
+        // Sandboxed iframe protection
       }
     }
   }, [activeSection]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const handlePopState = () => {
-        const path = window.location.pathname;
-        if (path === '/privacy-policy') {
-          setActiveSection('privacy-policy');
-        } else if (path === '/terms' || path === '/terms-of-service') {
-          setActiveSection('terms-of-service');
-        } else if (path === '/admin') {
-          setActiveSection('admin');
-        } else if (path === '/my-account') {
-          setActiveSection('dashboard');
-        } else {
-          setActiveSection('home');
-        }
-      };
-      window.addEventListener('popstate', handlePopState);
-      return () => window.removeEventListener('popstate', handlePopState);
+      try {
+        const handlePopState = () => {
+          try {
+            const path = window.location.pathname;
+            if (path === '/privacy-policy') {
+              setActiveSection('privacy-policy');
+            } else if (path === '/terms' || path === '/terms-of-service') {
+              setActiveSection('terms-of-service');
+            } else if (path === '/admin') {
+              setActiveSection('admin');
+            } else if (path === '/my-account') {
+              setActiveSection('dashboard');
+            } else {
+              setActiveSection('home');
+            }
+          } catch (e) {}
+        };
+        window.addEventListener('popstate', handlePopState);
+        return () => window.removeEventListener('popstate', handlePopState);
+      } catch (e) {}
     }
   }, []);
   const [selectedService, setSelectedService] = useState<Service | null>(null);
@@ -410,52 +446,64 @@ export default function App() {
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      // 1. Standalone and iOS Checks
-      const standalone = window.matchMedia('(display-mode: standalone)').matches ||
-        (window.navigator as any).standalone === true;
-      setIsStandalone(standalone);
+      try {
+        // 1. Standalone and iOS Checks
+        let standalone = false;
+        try {
+          standalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
+            (window.navigator as any)?.standalone === true;
+        } catch (e) {}
+        setIsStandalone(!!standalone);
 
-      const userAgent = window.navigator.userAgent.toLowerCase();
-      const isIOSDevice = /iphone|ipad|ipod/.test(userAgent);
-      setIsIOS(isIOSDevice);
+        const userAgent = (window.navigator?.userAgent || '').toLowerCase();
+        const isIOSDevice = /iphone|ipad|ipod/.test(userAgent);
+        setIsIOS(isIOSDevice);
 
-      // 2. Service Worker Registration
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js')
-            .then(reg => console.log('PWA SW registered with scope: ', reg.scope))
-            .catch(err => console.log('PWA SW registration failed: ', err));
-        });
-      }
-
-      // 3. beforeinstallprompt Event Listener
-      const handleBeforeInstallPrompt = (e: Event) => {
-        e.preventDefault();
-        setDeferredPrompt(e);
-
-        const dismissed = sessionStorage.getItem('goye_pwa_banner_dismissed');
-        if (!dismissed && !standalone) {
-          setTimeout(() => {
-            setShowInstallBanner(true);
-          }, 3000);
+        // 2. Service Worker Registration (Production only)
+        if (
+          'serviceWorker' in navigator &&
+          !window.location.hostname.includes('run.app') &&
+          window.location.hostname !== 'localhost' &&
+          window.location.hostname !== '127.0.0.1'
+        ) {
+          window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/sw.js')
+              .then(reg => console.log('PWA SW registered with scope: ', reg.scope))
+              .catch(err => console.log('PWA SW registration failed: ', err));
+          });
         }
-      };
 
-      window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+        // 3. beforeinstallprompt Event Listener
+        const handleBeforeInstallPrompt = (e: Event) => {
+          e.preventDefault();
+          setDeferredPrompt(e);
 
-      // 4. iOS manual trigger after 3s if not standalone
-      if (isIOSDevice && !standalone) {
-        const dismissed = sessionStorage.getItem('goye_pwa_banner_dismissed');
-        if (!dismissed) {
-          setTimeout(() => {
-            setShowInstallBanner(true);
-          }, 3000);
+          const dismissed = safeStorage.get('session', 'goye_pwa_banner_dismissed');
+          if (!dismissed && !standalone) {
+            setTimeout(() => {
+              setShowInstallBanner(true);
+            }, 3000);
+          }
+        };
+
+        window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+        // 4. iOS manual trigger after 3s if not standalone
+        if (isIOSDevice && !standalone) {
+          const dismissed = safeStorage.get('session', 'goye_pwa_banner_dismissed');
+          if (!dismissed) {
+            setTimeout(() => {
+              setShowInstallBanner(true);
+            }, 3000);
+          }
         }
-      }
 
-      return () => {
-        window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-      };
+        return () => {
+          window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+        };
+      } catch (err) {
+        console.warn('PWA init notice:', err);
+      }
     }
   }, []);
 
@@ -473,14 +521,11 @@ export default function App() {
 
   const dismissInstallBanner = () => {
     setShowInstallBanner(false);
-    sessionStorage.setItem('goye_pwa_banner_dismissed', 'true');
+    safeStorage.set('session', 'goye_pwa_banner_dismissed', 'true');
   };
 
   const [adminToken, setAdminToken] = useState<string | null>(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('goye_admin_token');
-    }
-    return null;
+    return safeStorage.get('local', 'goye_admin_token');
   });
   const [isAdminVerified, setIsAdminVerified] = useState<boolean | null>(null);
 
@@ -503,13 +548,13 @@ export default function App() {
             setIsAdminVerified(true);
           } else {
             setIsAdminVerified(false);
-            localStorage.removeItem('goye_admin_token');
+            safeStorage.remove('local', 'goye_admin_token');
             setAdminToken(null);
           }
         })
         .catch(() => {
           setIsAdminVerified(false);
-          localStorage.removeItem('goye_admin_token');
+          safeStorage.remove('local', 'goye_admin_token');
           setAdminToken(null);
         });
       }
@@ -525,7 +570,7 @@ export default function App() {
       });
       if (res.ok) {
         const data = await res.json();
-        localStorage.setItem('goye_admin_token', data.token);
+        safeStorage.set('local', 'goye_admin_token', data.token);
         setAdminToken(data.token);
         setIsAdminVerified(true);
         return { success: true };
@@ -539,7 +584,7 @@ export default function App() {
   };
 
   const handleAdminLogout = () => {
-    localStorage.removeItem('goye_admin_token');
+    safeStorage.remove('local', 'goye_admin_token');
     setAdminToken(null);
     setIsAdminVerified(false);
   };
@@ -561,42 +606,62 @@ export default function App() {
   // Pi SDK Integration & detection
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      document.body.style.setProperty('background', '#000000', 'important');
-      if (navigator.userAgent.toLowerCase().includes('pibrowser') || (window as any).Pi) {
-        setIsPiBrowser(true);
+      try {
+        document.body.style.setProperty('background', '#000000', 'important');
+      } catch (e) {}
+
+      try {
         if ((window as any).Pi) {
-          try {
-            (window as any).Pi.init({ version: "2.0", sandbox: true });
-          } catch (e) {
-            console.warn("Pi Init error: ", e);
-          }
+          (window as any).Pi.init({ version: "2.0", sandbox: true });
         }
+      } catch (e) {
+        console.warn("Pi Init error: ", e);
       }
+
+      try {
+        if (navigator.userAgent.toLowerCase().includes('pibrowser') || (window as any).Pi) {
+          setIsPiBrowser(true);
+        }
+      } catch (e) {}
     }
   }, []);
 
   // Sync data on load
   useEffect(() => {
-    const savedUser = localStorage.getItem('goye_user_profile');
-    if (savedUser) setCurrentUser(JSON.parse(savedUser));
+    try {
+      const savedUser = safeStorage.get('local', 'goye_user_profile');
+      if (savedUser) setCurrentUser(JSON.parse(savedUser));
+    } catch (e) {}
 
-    const savedReqs = localStorage.getItem('goye_requests_v2');
-    if (savedReqs) setRequests(JSON.parse(savedReqs));
+    try {
+      const savedReqs = safeStorage.get('local', 'goye_requests_v2');
+      if (savedReqs) setRequests(JSON.parse(savedReqs));
+    } catch (e) {}
 
-    const savedQuotes = localStorage.getItem('goye_quotes_v2');
-    if (savedQuotes) setQuotes(JSON.parse(savedQuotes));
+    try {
+      const savedQuotes = safeStorage.get('local', 'goye_quotes_v2');
+      if (savedQuotes) setQuotes(JSON.parse(savedQuotes));
+    } catch (e) {}
 
-    const savedTickets = localStorage.getItem('goye_tickets_v2');
-    if (savedTickets) setSupportTickets(JSON.parse(savedTickets));
+    try {
+      const savedTickets = safeStorage.get('local', 'goye_tickets_v2');
+      if (savedTickets) setSupportTickets(JSON.parse(savedTickets));
+    } catch (e) {}
 
-    const savedDocs = localStorage.getItem('goye_docs_v2');
-    if (savedDocs) setDocuments(JSON.parse(savedDocs));
+    try {
+      const savedDocs = safeStorage.get('local', 'goye_docs_v2');
+      if (savedDocs) setDocuments(JSON.parse(savedDocs));
+    } catch (e) {}
 
-    const savedLogs = localStorage.getItem('goye_logs_v2');
-    if (savedLogs) setAuditLogs(JSON.parse(savedLogs));
+    try {
+      const savedLogs = safeStorage.get('local', 'goye_logs_v2');
+      if (savedLogs) setAuditLogs(JSON.parse(savedLogs));
+    } catch (e) {}
 
-    const savedPiConfig = localStorage.getItem('goye_pi_config_v2');
-    if (savedPiConfig) setPiConfig(JSON.parse(savedPiConfig));
+    try {
+      const savedPiConfig = safeStorage.get('local', 'goye_pi_config_v2');
+      if (savedPiConfig) setPiConfig(JSON.parse(savedPiConfig));
+    } catch (e) {}
   }, []);
 
   // Fetch and Sync user profile with the secure backend server
@@ -634,13 +699,13 @@ export default function App() {
 
       // Synchronize orders and quotes from secure backend database
       const headers: any = {};
-      const savedAdminToken = localStorage.getItem('goye_admin_token');
+      const savedAdminToken = safeStorage.get('local', 'goye_admin_token');
       if (savedAdminToken && currentUser.role === 'admin') {
         headers['Authorization'] = `Bearer ${savedAdminToken}`;
       }
 
       // Synchronize and sanitize local orders with server
-      const localReqsStr = localStorage.getItem('goye_requests_v2');
+      const localReqsStr = safeStorage.get('local', 'goye_requests_v2');
       if (localReqsStr) {
         try {
           const localReqs = JSON.parse(localReqsStr) as ServiceRequest[];
@@ -693,12 +758,16 @@ export default function App() {
 
   // Save changes to localStorage helper
   const saveState = (key: string, data: any) => {
-    localStorage.setItem(key, JSON.stringify(data));
+    try {
+      safeStorage.set('local', key, JSON.stringify(data));
+    } catch (e) {}
   };
 
   const handleUpdatePiConfig = (newConfig: typeof piConfig) => {
     setPiConfig(newConfig);
-    localStorage.setItem('goye_pi_config_v2', JSON.stringify(newConfig));
+    try {
+      safeStorage.set('local', 'goye_pi_config_v2', JSON.stringify(newConfig));
+    } catch (e) {}
   };
 
   const logAction = (actor: string, action: string, resourceId: string) => {
@@ -734,7 +803,7 @@ export default function App() {
       logAction(currentUser.name, 'User Logged Out', currentUser.id);
     }
     setCurrentUser(null);
-    localStorage.removeItem('goye_user_profile');
+    safeStorage.remove('local', 'goye_user_profile');
     setActiveSection('home');
   };
 
@@ -830,7 +899,7 @@ export default function App() {
 
     // Force synchronize with server order database to guarantee status integrity
     if (currentUser) {
-      const savedAdminToken = localStorage.getItem('goye_admin_token');
+      const savedAdminToken = safeStorage.get('local', 'goye_admin_token');
       const headers: any = {};
       if (savedAdminToken && currentUser.role === 'admin') {
         headers['Authorization'] = `Bearer ${savedAdminToken}`;
@@ -1940,7 +2009,7 @@ function DashboardView({ currentUser, onAuth, onLogout, setCurrentUser, requests
     };
     const updated = [newTicket, ...supportTickets];
     setSupportTickets(updated);
-    localStorage.setItem('goye_tickets_v2', JSON.stringify(updated));
+    safeStorage.set('local', 'goye_tickets_v2', JSON.stringify(updated));
     setTicketMsg('');
     alert("Support request submitted successfully.");
   };
@@ -2150,7 +2219,7 @@ function DashboardView({ currentUser, onAuth, onLogout, setCurrentUser, requests
                   if (res.ok) {
                     const data = await res.json();
                     setCurrentUser(data.profile);
-                    localStorage.setItem('goye_user_profile', JSON.stringify(data.profile));
+                    safeStorage.set('local', 'goye_user_profile', JSON.stringify(data.profile));
                     alert("Profile updated successfully on the secure server!");
                   } else {
                     alert("Failed to save profile changes to server.");
@@ -2320,7 +2389,7 @@ function AdminView({ currentUser, requests, setRequests, quotes, setQuotes, audi
         const data = await res.json();
         const updated = requests.map(r => r.id === id ? data.request : r);
         setRequests(updated);
-        localStorage.setItem('goye_requests_v2', JSON.stringify(updated));
+        safeStorage.set('local', 'goye_requests_v2', JSON.stringify(updated));
       } else {
         const errData = await res.json();
         alert(`Failed to update status on server: ${errData.error}`);
@@ -2357,7 +2426,7 @@ function AdminView({ currentUser, requests, setRequests, quotes, setQuotes, audi
       if (res.ok) {
         const updated = [newQuote, ...quotes];
         setQuotes(updated);
-        localStorage.setItem('goye_quotes_v2', JSON.stringify(updated));
+        safeStorage.set('local', 'goye_quotes_v2', JSON.stringify(updated));
 
         // Update Request status to QUOTE READY
         await handleUpdateStatus(selectedReq.id, 'QUOTE READY');

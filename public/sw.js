@@ -1,81 +1,91 @@
-const CACHE_NAME = 'goye-hub-cache-v1';
+const CACHE_NAME = 'goye-hub-cache-v3';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
-  '/manifest.json',
   '/goye_gold_logo_1790428812570.jpg',
   '/icon-192.png',
   '/icon-512.png'
 ];
 
-self.addEventListener('install', event => {
-  event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => {
-        console.log('[Service Worker] Caching app shell and core assets');
-        return cache.addAll(ASSETS_TO_CACHE);
-      })
-      .then(() => self.skipWaiting())
-  );
-});
+// Automatically unregister and clear all caches if running in development / preview (run.app or localhost)
+if (
+  self.location.hostname.includes('run.app') || 
+  self.location.hostname === 'localhost' || 
+  self.location.hostname === '127.0.0.1'
+) {
+  self.addEventListener('install', () => self.skipWaiting());
+  self.addEventListener('activate', event => {
+    event.waitUntil(
+      caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k))))
+        .then(() => self.registration.unregister())
+        .then(() => self.clients.claim())
+    );
+  });
+} else {
+  // Production PWA lifecycle (for goye-hub.vercel.app)
+  self.addEventListener('install', event => {
+    event.waitUntil(
+      caches.open(CACHE_NAME)
+        .then(cache => cache.addAll(ASSETS_TO_CACHE))
+        .then(() => self.skipWaiting())
+    );
+  });
 
-self.addEventListener('activate', event => {
-  event.waitUntil(
-    caches.keys().then(cacheNames => {
-      return Promise.all(
-        cacheNames.map(cache => {
-          if (cache !== CACHE_NAME) {
-            console.log('[Service Worker] Clearing old cache');
-            return caches.delete(cache);
-          }
-        })
-      );
-    }).then(() => self.clients.claim())
-  );
-});
-
-self.addEventListener('fetch', event => {
-  // Do NOT cache API endpoints or Pi SDK external resources
-  if (event.request.url.includes('/api/') || event.request.url.includes('minepi.com') || event.request.url.includes('paystack') || event.request.url.includes('flutterwave')) {
-    return;
-  }
-
-  // Handle standard GET requests only
-  if (event.request.method !== 'GET') {
-    return;
-  }
-
-  event.respondWith(
-    caches.match(event.request)
-      .then(cachedResponse => {
-        if (cachedResponse) {
-          // Serve from cache and update cache in background
-          fetch(event.request)
-            .then(networkResponse => {
-              if (networkResponse && networkResponse.status === 200) {
-                caches.open(CACHE_NAME).then(cache => {
-                  cache.put(event.request, networkResponse);
-                });
-              }
-            })
-            .catch(() => {/* Ignore backend fetch errors in background */});
-          return cachedResponse;
-        }
-
-        return fetch(event.request)
-          .then(networkResponse => {
-            if (!networkResponse || networkResponse.status !== 200) {
-              return networkResponse;
+  self.addEventListener('activate', event => {
+    event.waitUntil(
+      caches.keys().then(cacheNames => {
+        return Promise.all(
+          cacheNames.map(cache => {
+            if (cache !== CACHE_NAME) {
+              return caches.delete(cache);
             }
-            const responseToCache = networkResponse.clone();
-            caches.open(CACHE_NAME).then(cache => {
-              cache.put(event.request, responseToCache);
-            });
-            return networkResponse;
           })
-          .catch(err => {
-            console.log('[Service Worker] Offline fetch fallback:', err);
-          });
-      })
-  );
-});
+        );
+      }).then(() => self.clients.claim())
+    );
+  });
+
+  self.addEventListener('fetch', event => {
+    const url = event.request.url;
+
+    // Skip API, external SDKs, Vite modules, and Pi Browser validation requests (return network only, no cache)
+    if (
+      url.includes('/@') ||
+      url.includes('/src/') ||
+      url.includes('/node_modules/') ||
+      url.includes('/api/') || 
+      url.includes('minepi.com') || 
+      url.includes('paystack') || 
+      url.includes('flutterwave') ||
+      url.includes('validation-key.txt') ||
+      url.includes('manifest.json') ||
+      url.includes('pi-domain-verification.txt')
+    ) {
+      return; // Let browser make standard network request directly
+    }
+
+    if (event.request.method !== 'GET') {
+      return;
+    }
+
+    event.respondWith(
+      caches.match(event.request)
+        .then(cachedResponse => {
+          if (cachedResponse) {
+            fetch(event.request)
+              .then(networkResponse => {
+                if (networkResponse && networkResponse.status === 200) {
+                  caches.open(CACHE_NAME).then(cache => {
+                    cache.put(event.request, networkResponse);
+                  });
+                }
+              })
+              .catch(() => {});
+            return cachedResponse;
+          }
+          return fetch(event.request);
+        })
+        .catch(() => fetch(event.request))
+    );
+  });
+}

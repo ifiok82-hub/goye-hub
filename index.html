@@ -18,6 +18,21 @@
     <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
     <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png">
     <script src="https://sdk.minepi.com/pi-sdk.js"></script>
+    <script>
+      try {
+        Pi.init({ version: "2.0", sandbox: true });
+      } catch (e) {
+        if (typeof window !== 'undefined') {
+          window.addEventListener('DOMContentLoaded', function() {
+            try {
+              if (typeof Pi !== 'undefined') {
+                Pi.init({ version: "2.0", sandbox: true });
+              }
+            } catch (err) {}
+          });
+        }
+      }
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Poppins:wght@400;600;700;800;900&display=swap" rel="stylesheet">
@@ -25,6 +40,8 @@
       body {
         font-family: 'Inter', sans-serif;
         background: #000000 !important;
+        margin: 0;
+        padding: 0;
       }
       h1, h2, h3, h4, h5, h6 {
         font-family: 'Poppins', sans-serif;
@@ -36,13 +53,27 @@
     <script type="module" src="/src/main.tsx"></script>
     <script>
       if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js').then((registration) => {
-            console.log('ServiceWorker registration successful with scope: ', registration.scope);
-          }, (err) => {
-            console.log('ServiceWorker registration failed: ', err);
+        // Prevent stale service worker caches from breaking the dev/preview iframe
+        if (
+          window.location.hostname.includes('run.app') || 
+          window.location.hostname === 'localhost' || 
+          window.location.hostname === '127.0.0.1'
+        ) {
+          navigator.serviceWorker.getRegistrations().then(function(registrations) {
+            for (var i = 0; i < registrations.length; i++) {
+              registrations[i].unregister();
+            }
           });
-        });
+          if (window.caches) {
+            caches.keys().then(function(names) {
+              names.forEach(function(name) { caches.delete(name); });
+            });
+          }
+        } else {
+          window.addEventListener('load', function() {
+            navigator.serviceWorker.register('/sw.js').catch(function() {});
+          });
+        }
       }
     </script>
   </body>

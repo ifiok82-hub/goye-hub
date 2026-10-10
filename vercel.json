@@ -1,15 +1,51 @@
 {
   "rewrites": [
-    { "source": "/(.*)", "destination": "/" }
+    { "source": "/validation-key.txt", "destination": "/validation-key.txt" },
+    { "source": "/.well-known/validation-key.txt", "destination": "/validation-key.txt" },
+    { "source": "/.well-known/pi-domain-verification.txt", "destination": "/.well-known/pi-domain-verification.txt" },
+    { "source": "/manifest.json", "destination": "/manifest.json" },
+    { "source": "/sw.js", "destination": "/sw.js" },
+    { "source": "/icon-192.png", "destination": "/icon-192.png" },
+    { "source": "/icon-512.png", "destination": "/icon-512.png" },
+    { "source": "/(.*)", "destination": "/index.html" }
   ],
   "headers": [
     {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "Access-Control-Allow-Origin", "value": "*" },
+        { "key": "X-Content-Type-Options", "value": "nosniff" }
+      ]
+    },
+    {
+      "source": "/validation-key.txt",
+      "headers": [
+        { "key": "Content-Type", "value": "text/plain" }
+      ]
+    },
+    {
+      "source": "/.well-known/validation-key.txt",
+      "headers": [
+        { "key": "Content-Type", "value": "text/plain" }
+      ]
+    },
+    {
+      "source": "/.well-known/pi-domain-verification.txt",
+      "headers": [
+        { "key": "Content-Type", "value": "text/plain" }
+      ]
+    },
+    {
       "source": "/manifest.json",
-      "headers": [{ "key": "Content-Type", "value": "application/manifest+json" }]
+      "headers": [
+        { "key": "Content-Type", "value": "application/manifest+json" }
+      ]
     },
     {
       "source": "/sw.js",
-      "headers": [{ "key": "Content-Type", "value": "application/javascript" }]
+      "headers": [
+        { "key": "Content-Type", "value": "application/javascript" }
+      ]
     }
   ]
 }

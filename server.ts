@@ -254,6 +254,16 @@ async function createServer() {
     res.json({ status: 'success', received: true });
   });
 
+  // Dedicated Pi validation key endpoint returning pure text/plain
+  app.get(['/validation-key.txt', '/.well-known/validation-key.txt', '/.well-known/pi-domain-verification.txt'], (req, res) => {
+    const keyPath = path.join(__dirname, 'public', 'validation-key.txt');
+    if (fs.existsSync(keyPath)) {
+      res.setHeader('Content-Type', 'text/plain');
+      return res.sendFile(keyPath);
+    }
+    res.status(404).send('Not found');
+  });
+
   // Secure API Route to pull System Health metrics without exposing keys
   app.get('/api/health', (req, res) => {
     const isDbReady = isDatabaseConfigured();
