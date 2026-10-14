@@ -38,7 +38,7 @@ if (process.env.FIREBASE_CONFIG) {
     appId: process.env.FIREBASE_APP_ID,
     apiKey: process.env.FIREBASE_API_KEY,
     authDomain: process.env.FIREBASE_AUTH_DOMAIN,
-    firestoreDatabaseId: process.env.FIREBASE_FIRESTORE_DATABASE_ID || "",
+    firestoreDatabaseId: process.env.FIREBASE_FIRESTORE_DATABASE_ID || "ai-studio-13394698-0151-460a-b10e-176ce56d3ba6",
     storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
   };
 }
@@ -71,7 +71,34 @@ function readDbJson(): any {
   } catch (e) {
     console.error("Error reading db.json:", e);
   }
-  return { contracts: {}, deals: {}, invoices: {}, users: {} };
+  return { 
+    users: {}, 
+    profiles: {}, 
+    businesses: {},
+    business_verifications: {},
+    business_qr_codes: {},
+    ai_agents: {},
+    ai_knowledge: {},
+    ai_conversations: {},
+    sales_leads: {},
+    support_tickets: {},
+    contracts: {},
+    invoices: {},
+    payments: {},
+    marketplace_listings: {},
+    bookings: {},
+    booking_availability: {},
+    trade_deals: {},
+    documents: {},
+    growth_reports: {},
+    audit_logs: {},
+    orders: {},
+    services: {}, 
+    service_requests: {}, 
+    quotes: {}, 
+    admin_users: {}, 
+    pi_payments: {} 
+  };
 }
 
 function writeDbJson(data: any) {
@@ -88,8 +115,8 @@ export async function getCollection(collectionName: string): Promise<any[]> {
       const colRef = collection(dbInstance, collectionName);
       const snapshot = await getDocs(colRef);
       const results: any[] = [];
-      snapshot.forEach(doc => {
-        results.push({ id: doc.id, ...doc.data() });
+      snapshot.forEach(docSnap => {
+        results.push({ id: docSnap.id, ...docSnap.data() });
       });
       return results;
     } catch (error) {

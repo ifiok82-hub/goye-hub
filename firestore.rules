@@ -12,6 +12,10 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
     function isValidId(id) {
       return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
     }
@@ -20,30 +24,40 @@ service cloud.firestore {
       return request.resource.data;
     }
 
-    // User collection rules
+    // Users collection
     match /users/{userId} {
-      allow get: if isSignedIn() && request.auth.uid == userId;
+      allow get: if isOwner(userId);
       allow list: if isSignedIn() && resource.data.id == request.auth.uid;
-      allow create, update: if isSignedIn() && request.auth.uid == userId && incoming().id == userId;
+      allow create, update: if isOwner(userId) && incoming().id == userId;
       allow delete: if false;
     }
 
-    // Contracts collection rules
-    match /contracts/{contractId} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn();
+    // Service Requests collection
+    match /service_requests/{requestId} {
+      allow get: if isSignedIn() && (resource.data.userId == request.auth.uid);
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid);
+      allow create: if isSignedIn() && incoming().userId == request.auth.uid;
+      allow update: if isSignedIn() && resource.data.userId == request.auth.uid && incoming().userId == request.auth.uid;
+      allow delete: if false;
     }
 
-    // Deals collection rules
-    match /deals/{dealId} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn();
+    // Quotes collection
+    match /quotes/{quoteId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create, update, delete: if false; // Server-managed
     }
 
-    // Invoices collection rules
-    match /invoices/{invoiceId} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn();
+    // Support tickets
+    match /support_tickets/{ticketId} {
+      allow get, list: if isSignedIn() && (resource.data.userId == request.auth.uid);
+      allow create: if isSignedIn() && incoming().userId == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    // Audit logs (immutable)
+    match /audit_logs/{logId} {
+      allow read, write: if false; // Server-managed only
     }
   }
 }

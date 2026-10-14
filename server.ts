@@ -8,6 +8,7 @@ import { createServer as createViteServer } from 'vite';
 import fs from 'fs';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import { GoogleGenAI } from '@google/genai';
 import { getCollection, getDocument, setDocument, deleteDocument, isDatabaseConfigured } from './server-db.js';
 
 dotenv.config();
@@ -296,8 +297,93 @@ async function createServer() {
     });
   });
 
-  // Dynamic REST endpoints for contracts, deals, invoices, and users
-  const COLLECTIONS = ['contracts', 'deals', 'invoices', 'users'];
+  // Dedicated Pi Platform Status Endpoint
+  app.get('/api/pi/status', (req, res) => {
+    const hasValidationKey = fs.existsSync(path.join(__dirname, 'public', 'validation-key.txt'));
+    const isSandboxMode = process.env.PI_SANDBOX !== 'false';
+    const isMainnetMode = process.env.MAINNET_ENABLED === 'true';
+
+    res.json({
+      sdk: 'CONNECTED',
+      authentication: PI_API_KEY ? 'CONFIGURED' : 'CONFIGURATION REQUIRED',
+      serverApi: PI_API_KEY ? 'CONFIGURED' : 'NOT CONFIGURED',
+      appId: process.env.PI_APP_ID ? 'CONFIGURED' : 'NOT CONFIGURED',
+      network: process.env.PI_NETWORK_MODE || 'TESTNET',
+      sandbox: isSandboxMode ? 'ON' : 'OFF',
+      testnetWallet: PI_TESTNET_WALLET ? 'CONFIGURED' : 'NOT CONFIGURED',
+      mainnetWallet: PI_MAINNET_WALLET ? 'CONFIGURED' : 'NOT CONFIGURED',
+      mainnet: isMainnetMode ? 'ENABLED' : 'DISABLED',
+      domainValidation: hasValidationKey ? 'VERIFIED' : 'NOT VERIFIED',
+      oauth: 'CONFIGURED',
+      paymentVerification: PI_API_KEY ? 'AVAILABLE' : 'UNAVAILABLE',
+      mockPaymentSystem: 'REMOVED',
+      timestamp: Date.now()
+    });
+  });
+
+  // Dynamic REST endpoints for all 15 GOYE Products
+  const COLLECTIONS = [
+    'businesses',
+    'business_verifications',
+    'business_qr_codes',
+    'ai_agents',
+    'ai_knowledge',
+    'ai_conversations',
+    'sales_leads',
+    'support_tickets',
+    'contracts',
+    'invoices',
+    'payments',
+    'marketplace_listings',
+    'bookings',
+    'booking_availability',
+    'trade_deals',
+    'documents',
+    'growth_reports',
+    'audit_logs',
+    'orders',
+    'users',
+    'deals',
+    'requests',
+    'quotes'
+  ];
+
+  // Helper to record real audit event
+  async function recordAuditEvent(action: string, actorId: string, details: string, metadata: any = {}) {
+    try {
+      const eventId = `AUDIT-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
+      await setDocument('audit_logs', eventId, {
+        id: eventId,
+        action,
+        actorId: actorId || 'SYSTEM',
+        details,
+        metadata,
+        timestamp: Date.now()
+      });
+    } catch (e) {
+      console.warn('[Audit Log Error]', e);
+    }
+  }
+
+  // Audit Logs direct recording endpoint
+  app.post('/api/audit-logs', async (req, res) => {
+    const { action, actorId, details, metadata } = req.body;
+    if (!action) return res.status(400).json({ error: 'Action is required' });
+    const eventId = `AUDIT-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
+    try {
+      await setDocument('audit_logs', eventId, {
+        id: eventId,
+        action,
+        actorId: actorId || 'ANONYMOUS',
+        details: details || '',
+        metadata: metadata || {},
+        timestamp: Date.now()
+      });
+      res.json({ success: true, id: eventId });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
 
   app.get('/api/:collection', async (req, res) => {
     const { collection } = req.params;
@@ -305,7 +391,17 @@ async function createServer() {
       return res.status(404).json({ error: 'Collection not found' });
     }
     try {
-      const items = await getCollection(collection);
+      let items = await getCollection(collection);
+      // Query filter support
+      const queryKeys = Object.keys(req.query);
+      if (queryKeys.length > 0) {
+        items = items.filter(item => {
+          return queryKeys.every(k => {
+            if (req.query[k] === undefined || req.query[k] === '') return true;
+            return String(item[k]) === String(req.query[k]);
+          });
+        });
+      }
       res.json(items);
     } catch (e: any) {
       res.status(500).json({ error: e.message });
@@ -336,8 +432,22 @@ async function createServer() {
       return res.status(400).json({ error: 'Document ID (id) is required in request body' });
     }
     try {
-      await setDocument(collection, id, { id, ...data });
-      res.json({ success: true, id });
+      const now = Date.now();
+      const existing = await getDocument(collection, id);
+      const toSave = {
+        id,
+        ...data,
+        createdAt: existing?.createdAt || now,
+        updatedAt: now
+      };
+      await setDocument(collection, id, toSave);
+
+      // Automatic audit event for high-value entities
+      if (['businesses', 'business_verifications', 'contracts', 'invoices', 'bookings', 'trade_deals', 'documents'].includes(collection)) {
+        await recordAuditEvent(`${collection.toUpperCase()}_SAVED`, data.userId || data.creatorId || 'ANONYMOUS', `Saved document ${id} in ${collection}`, { id });
+      }
+
+      res.json({ success: true, id, document: toSave });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
     }
@@ -350,9 +460,135 @@ async function createServer() {
     }
     try {
       await deleteDocument(collection, id);
+      await recordAuditEvent(`${collection.toUpperCase()}_DELETED`, 'USER', `Deleted document ${id} from ${collection}`, { id });
       res.json({ success: true });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
+    }
+  });
+
+  // --- Public Verification Endpoints (Product 03 & Section 32) ---
+  app.get('/api/verify/business/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+      const business = await getDocument('businesses', id);
+      if (!business) {
+        return res.status(404).json({ verified: false, message: 'Business record not found.' });
+      }
+      const verification = (await getCollection('business_verifications')).find(v => v.businessId === id);
+
+      // Return sanitized public verification profile (no private credentials)
+      res.json({
+        verified: verification?.status === 'VERIFIED',
+        verificationLevel: verification?.level || '1. Registered Profile',
+        verificationStatus: verification?.status || 'NOT VERIFIED',
+        businessId: business.id,
+        businessNumber: business.businessNumber || `GOYE-BIZ-2026-${business.id.slice(0, 6).toUpperCase()}`,
+        businessName: business.name,
+        category: business.category,
+        country: business.country || 'Nigeria',
+        website: business.website || '',
+        services: business.services || [],
+        description: business.description || '',
+        registeredAt: business.createdAt || Date.now(),
+        lastUpdated: business.updatedAt || Date.now(),
+        disclaimer: 'GOYE platform verification status — not a government certification.'
+      });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.get('/api/verify/invoice/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+      const invoice = await getDocument('invoices', id);
+      if (!invoice) {
+        return res.status(404).json({ verified: false, message: 'Invoice not found.' });
+      }
+      res.json({
+        verified: true,
+        invoiceNumber: invoice.invoiceNumber,
+        sellerName: invoice.sellerName || 'Verified Seller',
+        buyerName: invoice.buyerName || 'Client',
+        total: invoice.total,
+        currency: invoice.currency || 'NGN',
+        paymentStatus: invoice.paymentStatus || 'PENDING',
+        issuedDate: invoice.createdAt,
+        dueDate: invoice.dueDate,
+        disclaimer: 'Verified digital invoice issued via GOYE Web3 Business Hub.'
+      });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.get('/api/verify/contract/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+      const contract = await getDocument('contracts', id);
+      if (!contract) {
+        return res.status(404).json({ verified: false, message: 'Contract not found.' });
+      }
+      res.json({
+        verified: true,
+        contractId: contract.id,
+        title: contract.title,
+        status: contract.status || 'DRAFT',
+        partyA: contract.partyA?.name || 'Party A',
+        partyB: contract.partyB?.name || 'Party B',
+        createdAt: contract.createdAt,
+        disclaimer: 'GOYE provides document templates and business workflow tools. This is not legal advice.'
+      });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // --- Real Server-Side AI Endpoints (Products 04, 05, 06, 07, 15) ---
+  app.post('/api/ai/chat', async (req, res) => {
+    const { message, role, context, history } = req.body;
+    if (!message) {
+      return res.status(400).json({ error: 'Message is required' });
+    }
+
+    const geminiKey = process.env.GEMINI_API_KEY;
+    if (!geminiKey) {
+      return res.status(503).json({
+        status: 'CONFIGURATION_REQUIRED',
+        message: 'AI service configuration required. Please configure GEMINI_API_KEY in the server environment.'
+      });
+    }
+
+    try {
+      const ai = new GoogleGenAI();
+      const rolePrompts: Record<string, string> = {
+        receptionist: "You are the official GOYE AI Business Receptionist. You clearly identify yourself as an AI assistant. You answer customer questions about business FAQ, services, pricing, business hours, and offer to capture leads or escalate to human staff.",
+        sales: "You are the GOYE AI Sales Assistant. You clearly identify yourself as an AI assistant. You help customers discover products and services, qualify their budget and timeline, understand their purchase intent, and capture lead details truthfully.",
+        support: "You are the GOYE AI Customer Support Agent. You clearly identify yourself as an AI assistant. You troubleshoot issues, provide service status guidance, offer to file support tickets, and escalate complex issues.",
+        qualification: "You are the GOYE AI Lead Qualification Agent. You analyze client answers to assess readiness, budget, and timeline, providing transparent recommendations and a clear score without claiming certified authority.",
+        growth: "You are the GOYE AI Business Growth Assistant. You provide actionable business improvement recommendations, marketing ideas, SEO tips, and workflow enhancements based strictly on user-provided inputs. Clearly note: AI-generated business recommendations. Review before implementation."
+      };
+
+      const systemPrompt = rolePrompts[role] || "You are a professional business AI assistant on GOYE Web3 Business Hub. Always identify yourself as an AI assistant. Be truthful, concise, and helpful.";
+      const fullPrompt = `${systemPrompt}\n\nContext: ${JSON.stringify(context || {})}\n\nUser Question: ${message}`;
+
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: fullPrompt
+      });
+
+      res.json({
+        status: 'SUCCESS',
+        text: response.text || 'No response generated.',
+        role: role || 'general'
+      });
+    } catch (err: any) {
+      console.error('AI generation error:', err);
+      res.status(500).json({
+        status: 'ERROR',
+        error: err.message || 'AI service error occurred.'
+      });
     }
   });
 

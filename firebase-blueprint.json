@@ -1,73 +1,102 @@
 {
   "entities": {
-    "Contract": {
-      "title": "Contract",
-      "description": "Contract agreements between customers and divisions",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "title": { "type": "string" },
-        "status": { "type": "string" },
-        "amount": { "type": "number" },
-        "createdAt": { "type": "string" }
-      },
-      "required": ["id", "title"]
-    },
-    "Deal": {
-      "title": "Deal",
-      "description": "Business deal leads and pipeline requests",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "name": { "type": "string" },
-        "value": { "type": "number" },
-        "status": { "type": "string" },
-        "createdAt": { "type": "string" }
-      },
-      "required": ["id", "name"]
-    },
-    "Invoice": {
-      "title": "Invoice",
-      "description": "Invoice billing and billing references",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "invoiceNumber": { "type": "string" },
-        "amount": { "type": "number" },
-        "status": { "type": "string" },
-        "createdAt": { "type": "string" }
-      },
-      "required": ["id", "invoiceNumber"]
-    },
     "User": {
       "title": "User",
-      "description": "User login identity and profiles",
+      "description": "User login identity and role",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
         "name": { "type": "string" },
         "email": { "type": "string" },
-        "role": { "type": "string" }
+        "phone": { "type": "string" },
+        "role": { "type": "string" },
+        "createdAt": { "type": "number" }
       },
-      "required": ["id", "name"]
+      "required": ["id", "email"]
+    },
+    "ServiceRequest": {
+      "title": "ServiceRequest",
+      "description": "Customer service request or order across CAC, Web, AI, or Digital",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "requestNumber": { "type": "string" },
+        "userId": { "type": "string" },
+        "serviceId": { "type": "string" },
+        "serviceName": { "type": "string" },
+        "type": { "type": "string" },
+        "status": { "type": "string" },
+        "amount": { "type": "number" },
+        "paymentRef": { "type": "string" },
+        "paymentProvider": { "type": "string" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["id", "requestNumber", "userId", "serviceId"]
+    },
+    "Quote": {
+      "title": "Quote",
+      "description": "Custom service quotation issued to a customer",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "quoteNumber": { "type": "string" },
+        "requestId": { "type": "string" },
+        "serviceName": { "type": "string" },
+        "total": { "type": "number" },
+        "currency": { "type": "string" },
+        "status": { "type": "string" },
+        "expiresAt": { "type": "number" }
+      },
+      "required": ["id", "quoteNumber", "total"]
+    },
+    "SupportTicket": {
+      "title": "SupportTicket",
+      "description": "Customer support desk inquiry or ticket",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "category": { "type": "string" },
+        "message": { "type": "string" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["id", "userId", "message"]
+    },
+    "AuditLog": {
+      "title": "AuditLog",
+      "description": "System operational audit and security event log",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "actor": { "type": "string" },
+        "action": { "type": "string" },
+        "resourceId": { "type": "string" },
+        "timestamp": { "type": "number" }
+      },
+      "required": ["id", "actor", "action"]
     }
   },
   "firestore": {
-    "/contracts/{contractId}": {
-      "schema": "Contract",
-      "description": "Store all contracts"
-    },
-    "/deals/{dealId}": {
-      "schema": "Deal",
-      "description": "Store all deals"
-    },
-    "/invoices/{invoiceId}": {
-      "schema": "Invoice",
-      "description": "Store all invoices"
-    },
     "/users/{userId}": {
       "schema": "User",
-      "description": "Store user records"
+      "description": "Customer and admin profile collection"
+    },
+    "/service_requests/{requestId}": {
+      "schema": "ServiceRequest",
+      "description": "Orders and service requests for CAC, Web, AI, Digital"
+    },
+    "/quotes/{quoteId}": {
+      "schema": "Quote",
+      "description": "Quotations issued by administrator"
+    },
+    "/support_tickets/{ticketId}": {
+      "schema": "SupportTicket",
+      "description": "Customer support desk tickets"
+    },
+    "/audit_logs/{logId}": {
+      "schema": "AuditLog",
+      "description": "Immutable operational audit trails"
     }
   }
 }

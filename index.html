@@ -4,9 +4,9 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>GOYE SERVICES HUB | CAC Services, Websites, AI Bots & Digital Solutions</title>
-    <meta name="description" content="CAC Services • Websites • AI Bots • Digital Business Solutions. Professional hub for elite business growth." />
+    <meta name="description" content="Professional CAC Registration, Website Development, AI Chatbots, and Digital Business Solutions. Your unified hub for digital growth." />
     <meta property="og:title" content="GOYE SERVICES HUB" />
-    <meta property="og:description" content="Professional CAC registration, Website development, and AI automation for businesses." />
+    <meta property="og:description" content="Professional CAC Registration, Website Development, AI Chatbots, and Digital Business Solutions. Your unified hub for digital growth." />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
     <link rel="manifest" href="/manifest.json">
@@ -17,10 +17,21 @@
     <link rel="apple-touch-icon" href="/goye_gold_logo_1790428812570.jpg">
     <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
     <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png">
+    <script>
+      try {
+        if (typeof window !== 'undefined') {
+          window.alert = function(msg) { console.log('[Notice]:', msg); };
+          window.confirm = function(msg) { console.log('[Confirm]:', msg); return true; };
+          window.prompt = function(_msg, def) { return def || null; };
+        }
+      } catch (e) {}
+    </script>
     <script src="https://sdk.minepi.com/pi-sdk.js"></script>
     <script>
       try {
-        Pi.init({ version: "2.0", sandbox: true });
+        if (typeof Pi !== 'undefined') {
+          Pi.init({ version: "2.0", sandbox: true });
+        }
       } catch (e) {
         if (typeof window !== 'undefined') {
           window.addEventListener('DOMContentLoaded', function() {

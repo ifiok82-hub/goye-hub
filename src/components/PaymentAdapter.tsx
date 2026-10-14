@@ -142,7 +142,6 @@ export function PaymentAdapter({ item, currentUser, onClose, onComplete, piConfi
         setBushaStatus('VERIFIED');
         setIsVerifying(false);
         onComplete(txHash.trim(), `BUSHA_${asset}`);
-        alert(`Busha payment verified successfully on-chain! Status updated.`);
       } else {
         setBushaStatus('IDLE');
         setPaymentError(data.error || 'Transaction verification failed on blockchain. Please double check Tx Hash.');

@@ -28,10 +28,21 @@ class RootErrorBoundary extends Component<Props, State> {
 
   handleRestore = () => {
     try {
-      localStorage.clear();
-      sessionStorage.clear();
+      if (typeof window !== 'undefined') {
+        window.localStorage?.clear();
+        window.sessionStorage?.clear();
+      }
     } catch (e) {}
-    window.location.reload();
+    this.setState({ hasError: false, error: null });
+    try {
+      if (typeof window !== 'undefined' && window.location) {
+        if (window.location.pathname !== '/') {
+          window.location.href = '/';
+        } else {
+          window.location.reload();
+        }
+      }
+    } catch (e) {}
   };
 
   render() {
@@ -50,20 +61,40 @@ class RootErrorBoundary extends Component<Props, State> {
           textAlign: 'center'
         }}>
           <div style={{
-            maxWidth: '480px',
-            backgroundColor: '#0A1931',
-            border: '1px solid #D4AF37',
+            maxWidth: '520px',
+            width: '100%',
+            backgroundColor: '#0a0a0a',
+            border: '1px solid rgba(255, 215, 0, 0.3)',
             borderRadius: '24px',
             padding: '36px 24px',
-            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.75)'
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.9)'
           }}>
-            <div style={{ fontSize: '32px', marginBottom: '12px' }}>⚡</div>
-            <h1 style={{ fontSize: '20px', fontWeight: '900', letterSpacing: '0.05em', marginBottom: '12px', color: '#FFD700', textTransform: 'uppercase' }}>
+            <div style={{ fontSize: '36px', marginBottom: '12px' }}>⚡</div>
+            <h1 style={{ fontSize: '20px', fontWeight: '900', letterSpacing: '0.05em', marginBottom: '8px', color: '#FFD700', textTransform: 'uppercase' }}>
               GOYE SERVICES HUB
             </h1>
-            <p style={{ fontSize: '13px', color: '#e2e8f0', marginBottom: '24px', lineHeight: '1.6', fontWeight: '500' }}>
-              Preview recovered from transient session interruption. Tap below to reload the live application.
+            <p style={{ fontSize: '13px', color: '#e2e8f0', marginBottom: '20px', lineHeight: '1.6', fontWeight: '500' }}>
+              Click below to reset session cache and restore the application view.
             </p>
+
+            {this.state.error && (
+              <div style={{
+                marginBottom: '20px',
+                padding: '12px',
+                backgroundColor: 'rgba(255, 0, 0, 0.1)',
+                border: '1px solid rgba(255, 0, 0, 0.3)',
+                borderRadius: '12px',
+                color: '#ff8888',
+                fontSize: '11px',
+                textAlign: 'left',
+                maxHeight: '120px',
+                overflowY: 'auto',
+                fontFamily: 'monospace'
+              }}>
+                {this.state.error.message || String(this.state.error)}
+              </div>
+            )}
+
             <button
               onClick={this.handleRestore}
               style={{
@@ -77,7 +108,7 @@ class RootErrorBoundary extends Component<Props, State> {
                 cursor: 'pointer',
                 letterSpacing: '0.08em',
                 textTransform: 'uppercase',
-                boxShadow: '0 4px 12px rgba(255, 215, 0, 0.3)'
+                boxShadow: '0 4px 14px rgba(255, 215, 0, 0.4)'
               }}
             >
               RESTORE PREVIEW & REFRESH

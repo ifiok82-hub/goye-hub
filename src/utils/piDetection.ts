@@ -1,4 +1,9 @@
-export const isPiBrowser = () => {
+export const isPiBrowser = (): boolean => {
   if (typeof window === 'undefined') return false;
-  return !!(window as any).Pi || navigator.userAgent.includes('PiBrowser');
+  try {
+    const ua = (navigator.userAgent || '').toLowerCase();
+    return ua.includes('pibrowser') || !!(window as any).__PI_BROWSER__;
+  } catch {
+    return false;
+  }
 };

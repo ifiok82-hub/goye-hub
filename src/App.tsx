@@ -50,6 +50,10 @@ export const PI_TESTNET_WALLET = "GASU7HADLZKZE4A6EPRWW5QNMGHQBSL6FR3ED4N4ZR3KYD
 export const PI_MAINNET_WALLET = "GBR4B47WY7JDK2JKUUQQTWWQENOUUYTAQAOYLXZ7XE36YFQY6LKPVO6R";
 const BRAND_GOLD = "#FFD700";
 
+// Safe notification context to prevent iframe alert crashes
+export const ToastContext = React.createContext<(msg: string, type?: 'success' | 'error' | 'info') => void>(() => {});
+export const useToast = () => React.useContext(ToastContext);
+
 // --- Types ---
 type Section = 'home' | 'services' | 'dashboard' | 'admin' | 'faq' | 'about' | 'contact' | 'legal' | 'privacy-policy' | 'terms-of-service';
 type ServiceType = 'CAC' | 'WEB' | 'AI' | 'DIG';
@@ -356,6 +360,39 @@ const safeStorage = {
   }
 };
 
+// Save changes to safeStorage helper
+const saveState = (key: string, data: any) => {
+  try {
+    safeStorage.set('local', key, JSON.stringify(data));
+  } catch (e) {}
+};
+
+// Global safe notify dispatcher for non-blocking iframe toast alerts
+let globalNotify: ((msg: string, type?: 'success' | 'error' | 'info') => void) | null = null;
+export const safeNotify = (msg: string, type: 'success' | 'error' | 'info' = 'info') => {
+  if (globalNotify) {
+    globalNotify(msg, type);
+  } else {
+    console.log(`[GOYE Notification (${type})]:`, msg);
+  }
+};
+
+// Protect from iframe sandbox DOMException: Blocked a frame with origin from accessing a cross-origin frame
+if (typeof window !== 'undefined') {
+  try {
+    window.alert = (msg: string) => {
+      safeNotify(String(msg), 'info');
+    };
+    window.confirm = (msg: string) => {
+      safeNotify(String(msg), 'info');
+      return true;
+    };
+    window.prompt = (_msg: string, defaultVal?: string) => {
+      return defaultVal || null;
+    };
+  } catch {}
+}
+
 export default function App() {
   const [activeSection, setActiveSection] = useState<Section>(() => {
     if (typeof window !== 'undefined') {
@@ -437,6 +474,22 @@ export default function App() {
   const [supportTickets, setSupportTickets] = useState<SupportTicket[]>([]);
   const [documents, setDocuments] = useState<GoyeDocument[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+
+  // Safe notification toast state
+  const [toast, setToast] = useState<{ message: string; type?: 'success' | 'error' | 'info' } | null>(null);
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    setToast({ message, type });
+    setTimeout(() => {
+      setToast(prev => (prev?.message === message ? null : prev));
+    }, 4500);
+  };
+
+  useEffect(() => {
+    globalNotify = showToast;
+    return () => {
+      globalNotify = null;
+    };
+  }, []);
 
   // PWA Install Prompt State and Handlers
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
@@ -756,13 +809,6 @@ export default function App() {
     }
   }, [currentUser?.id, activeSection]);
 
-  // Save changes to localStorage helper
-  const saveState = (key: string, data: any) => {
-    try {
-      safeStorage.set('local', key, JSON.stringify(data));
-    } catch (e) {}
-  };
-
   const handleUpdatePiConfig = (newConfig: typeof piConfig) => {
     setPiConfig(newConfig);
     try {
@@ -959,82 +1005,101 @@ export default function App() {
   );
 
   return (
-    <div className="min-h-screen bg-[#f8f9fa] text-slate-900 font-sans selection:bg-yellow-500/30">
-      {/* Header */}
-      <header className="fixed top-0 left-0 right-0 z-50 bg-[#ffffff] backdrop-blur-md border-b border-gray-100 shadow-sm">
-        <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
-          <div className="flex items-center gap-3 cursor-pointer group" onClick={() => setActiveSection('home')}>
-            <img src={ASSETS.LOGO} alt="GOYE Logo" className="w-10 h-10 object-contain rounded-lg shadow-sm border border-gray-100" />
-            <div>
-              <h1 className="text-sm md:text-base font-black tracking-tight text-[#0a0a0a] uppercase leading-none">GOYE SERVICES HUB</h1>
-              <p className="text-[8px] text-[#a1a1aa] font-black tracking-widest leading-none mt-1.5">BUILD • REGISTER • AUTOMATE & SCALE</p>
+    <ToastContext.Provider value={showToast}>
+      <div className="min-h-screen bg-[#000000] text-slate-100 font-sans selection:bg-yellow-500/30">
+        {/* Floating Toast Notification */}
+        {toast && (
+          <div className="fixed top-24 right-6 z-[99999] max-w-sm w-full animate-fadeIn shadow-2xl">
+            <div className={`p-4 rounded-2xl border flex items-center justify-between gap-3 text-xs font-bold uppercase tracking-wider backdrop-blur-md ${
+              toast.type === 'error'
+                ? 'bg-red-950/95 border-red-500/40 text-red-200'
+                : toast.type === 'success'
+                ? 'bg-emerald-950/95 border-emerald-500/40 text-emerald-200'
+                : 'bg-black/95 border-yellow-500/40 text-[#FFD700]'
+            }`}>
+              <p className="flex-1 leading-snug">{toast.message}</p>
+              <button onClick={() => setToast(null)} className="p-1 text-gray-400 hover:text-white transition-colors cursor-pointer">
+                <X size={14} />
+              </button>
             </div>
           </div>
+        )}
 
-          <nav className="hidden lg:flex items-center gap-8">
-            <button onClick={() => setActiveSection('home')} className={`text-xs font-black uppercase tracking-widest transition-colors ${activeSection === 'home' ? 'text-yellow-600' : 'text-gray-500 hover:text-black'}`}>Home</button>
-            <button onClick={() => { setSelectedService(null); setActiveSection('services'); }} className={`text-xs font-black uppercase tracking-widest transition-colors ${activeSection === 'services' ? 'text-yellow-600' : 'text-gray-500 hover:text-black'}`}>Services</button>
-            <button onClick={() => setActiveSection('faq')} className={`text-xs font-black uppercase tracking-widest transition-colors ${activeSection === 'faq' ? 'text-yellow-600' : 'text-gray-500 hover:text-black'}`}>Pricing</button>
-            <button onClick={() => setActiveSection('contact')} className={`text-xs font-black uppercase tracking-widest transition-colors ${activeSection === 'contact' ? 'text-yellow-600' : 'text-gray-500 hover:text-black'}`}>Contact</button>
-          </nav>
-
-          <div className="flex items-center gap-4">
-            {/* Desktop Auth Section */}
-            {currentUser ? (
-              <div className="hidden lg:flex items-center gap-3">
-                {isAdmin && (
-                  <button 
-                    onClick={() => setActiveSection('admin')}
-                    className="bg-black hover:bg-gray-900 text-white px-5 py-2.5 rounded-full font-black text-xs uppercase tracking-widest transition-all flex items-center gap-2 shadow"
-                  >
-                    <LayoutDashboard size={14} className="text-yellow-400" /> Admin Dashboard
-                  </button>
-                )}
-                <button 
-                  onClick={() => setActiveSection('dashboard')}
-                  className="bg-yellow-400 text-black px-5 py-2.5 rounded-full font-black text-xs uppercase tracking-widest hover:bg-yellow-300 transition-all flex items-center gap-2 shadow"
-                >
-                  <User size={14} /> My Account
-                </button>
-                <button onClick={handleLogout} className="p-2.5 bg-gray-100 hover:bg-gray-200 rounded-full transition-colors text-slate-800" title="Sign Out">
-                  <X size={16} />
-                </button>
+        {/* Header */}
+        <header className="fixed top-0 left-0 right-0 z-50 bg-[#0a0a0a]/95 backdrop-blur-md border-b border-yellow-500/20 shadow-xl">
+          <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+            <div className="flex items-center gap-3 cursor-pointer group" onClick={() => setActiveSection('home')}>
+              <img src={ASSETS.LOGO} alt="GOYE Logo" className="w-10 h-10 object-contain rounded-lg shadow-sm border border-yellow-500/20" />
+              <div>
+                <h1 className="text-sm md:text-base font-black tracking-tight text-white uppercase leading-none">GOYE SERVICES HUB</h1>
+                <p className="text-[8px] text-[#FFD700] font-black tracking-widest leading-none mt-1.5">BUILD • REGISTER • AUTOMATE & SCALE</p>
               </div>
-            ) : (
-              <button 
-                onClick={() => setActiveSection('dashboard')}
-                className="hidden lg:block bg-[#FFD700] hover:bg-yellow-400 text-black px-6 py-2.5 rounded-full font-black text-xs uppercase tracking-widest transition-all shadow-md"
-              >
-                Sign In
-              </button>
-            )}
+            </div>
 
-            {/* Mobile Header Buttons (Right side properly aligned next to Hamburger) */}
-            <div className="lg:hidden flex items-center gap-2">
+            <nav className="hidden lg:flex items-center gap-8">
+              <button onClick={() => setActiveSection('home')} className={`text-xs font-black uppercase tracking-widest transition-colors ${activeSection === 'home' ? 'text-[#FFD700]' : 'text-gray-300 hover:text-[#FFD700]'}`}>Home</button>
+              <button onClick={() => { setSelectedService(null); setActiveSection('services'); }} className={`text-xs font-black uppercase tracking-widest transition-colors ${activeSection === 'services' ? 'text-[#FFD700]' : 'text-gray-300 hover:text-[#FFD700]'}`}>Services</button>
+              <button onClick={() => setActiveSection('faq')} className={`text-xs font-black uppercase tracking-widest transition-colors ${activeSection === 'faq' ? 'text-[#FFD700]' : 'text-gray-300 hover:text-[#FFD700]'}`}>Pricing</button>
+              <button onClick={() => setActiveSection('contact')} className={`text-xs font-black uppercase tracking-widest transition-colors ${activeSection === 'contact' ? 'text-[#FFD700]' : 'text-gray-300 hover:text-[#FFD700]'}`}>Contact</button>
+            </nav>
+
+            <div className="flex items-center gap-4">
+              {/* Desktop Auth Section */}
               {currentUser ? (
-                <button 
-                  onClick={() => setActiveSection('dashboard')}
-                  className="bg-yellow-400 text-black px-4 py-2 rounded-full font-black text-[10px] uppercase tracking-widest hover:bg-yellow-300 transition-all flex items-center gap-1.5 shadow-sm"
-                >
-                  <User size={12} /> My Account
-                </button>
+                <div className="hidden lg:flex items-center gap-3">
+                  {isAdmin && (
+                    <button 
+                      onClick={() => setActiveSection('admin')}
+                      className="bg-[#0a0a0a] hover:bg-[#151515] text-white border border-yellow-500/30 px-5 py-2.5 rounded-full font-black text-xs uppercase tracking-widest transition-all flex items-center gap-2 shadow"
+                    >
+                      <LayoutDashboard size={14} className="text-[#FFD700]" /> Admin Dashboard
+                    </button>
+                  )}
+                  <button 
+                    onClick={() => setActiveSection('dashboard')}
+                    className="bg-[#FFD700] text-black px-5 py-2.5 rounded-full font-black text-xs uppercase tracking-widest hover:bg-yellow-400 transition-all flex items-center gap-2 shadow"
+                  >
+                    <User size={14} /> My Account
+                  </button>
+                  <button onClick={handleLogout} className="p-2.5 bg-neutral-900 hover:bg-neutral-800 rounded-full transition-colors text-gray-300 hover:text-white" title="Sign Out">
+                    <X size={16} />
+                  </button>
+                </div>
               ) : (
                 <button 
                   onClick={() => setActiveSection('dashboard')}
-                  className="bg-[#FFD700] hover:bg-yellow-400 text-black px-4 py-2 rounded-full font-black text-[10px] uppercase tracking-widest transition-all"
+                  className="hidden lg:block bg-[#FFD700] hover:bg-yellow-400 text-black px-6 py-2.5 rounded-full font-black text-xs uppercase tracking-widest transition-all shadow-md cursor-pointer"
                 >
                   Sign In
                 </button>
               )}
-            </div>
 
-            {/* Hamburger Trigger */}
-            <button className="lg:hidden p-2 text-slate-800 hover:bg-gray-100 rounded-full transition-colors" onClick={() => setIsMenuOpen(true)}>
-              <Menu size={24} />
-            </button>
+              {/* Mobile Header Buttons */}
+              <div className="lg:hidden flex items-center gap-2">
+                {currentUser ? (
+                  <button 
+                    onClick={() => setActiveSection('dashboard')}
+                    className="bg-[#FFD700] text-black px-4 py-2 rounded-full font-black text-[10px] uppercase tracking-widest hover:bg-yellow-400 transition-all flex items-center gap-1.5 shadow-sm"
+                  >
+                    <User size={12} /> My Account
+                  </button>
+                ) : (
+                  <button 
+                    onClick={() => setActiveSection('dashboard')}
+                    className="bg-[#FFD700] hover:bg-yellow-400 text-black px-4 py-2 rounded-full font-black text-[10px] uppercase tracking-widest transition-all"
+                  >
+                    Sign In
+                  </button>
+                )}
+              </div>
+
+              {/* Hamburger Trigger */}
+              <button className="lg:hidden p-2 text-gray-300 hover:text-white hover:bg-neutral-900 rounded-full transition-colors" onClick={() => setIsMenuOpen(true)}>
+                <Menu size={24} />
+              </button>
+            </div>
           </div>
-        </div>
-      </header>
+        </header>
 
       {/* Mobile Menu */}
       <AnimatePresence>
@@ -1043,27 +1108,27 @@ export default function App() {
             initial={{ x: '100%' }}
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
-            className="fixed inset-0 z-[100] bg-white p-8 flex flex-col text-slate-900"
+            className="fixed inset-0 z-[100] bg-[#0a0a0a] p-8 flex flex-col text-white"
           >
             <div className="flex justify-between items-center mb-12">
               <div className="flex items-center gap-2">
-                <img src={ASSETS.LOGO} alt="GOYE Logo" className="w-10 h-10 object-contain rounded-lg" />
-                <span className="font-black tracking-tight text-xl uppercase">GOYE SERVICES HUB</span>
+                <img src={ASSETS.LOGO} alt="GOYE Logo" className="w-10 h-10 object-contain rounded-lg border border-yellow-500/20" />
+                <span className="font-black tracking-tight text-xl uppercase text-white">GOYE SERVICES HUB</span>
               </div>
-              <button onClick={() => setIsMenuOpen(false)} className="p-2 text-slate-800">
+              <button onClick={() => setIsMenuOpen(false)} className="p-2 text-gray-300 hover:text-white">
                 <X size={24} />
               </button>
             </div>
             <div className="flex flex-col gap-8 flex-grow">
-              <button onClick={() => { setActiveSection('home'); setIsMenuOpen(false); }} className="text-3xl font-black text-left uppercase tracking-tight">Home</button>
-              <button onClick={() => { setSelectedService(null); setActiveSection('services'); setIsMenuOpen(false); }} className="text-3xl font-black text-left uppercase tracking-tight">Services</button>
-              <button onClick={() => { setActiveSection('dashboard'); setIsMenuOpen(false); }} className="text-3xl font-black text-left uppercase tracking-tight">Dashboard</button>
-              <button onClick={() => { setActiveSection('faq'); setIsMenuOpen(false); }} className="text-3xl font-black text-left uppercase tracking-tight">Pricing</button>
-              <button onClick={() => { setActiveSection('contact'); setIsMenuOpen(false); }} className="text-3xl font-black text-left uppercase tracking-tight">Contact</button>
+              <button onClick={() => { setActiveSection('home'); setIsMenuOpen(false); }} className="text-3xl font-black text-left uppercase tracking-tight text-white hover:text-[#FFD700] transition-colors">Home</button>
+              <button onClick={() => { setSelectedService(null); setActiveSection('services'); setIsMenuOpen(false); }} className="text-3xl font-black text-left uppercase tracking-tight text-white hover:text-[#FFD700] transition-colors">Services</button>
+              <button onClick={() => { setActiveSection('dashboard'); setIsMenuOpen(false); }} className="text-3xl font-black text-left uppercase tracking-tight text-white hover:text-[#FFD700] transition-colors">Dashboard</button>
+              <button onClick={() => { setActiveSection('faq'); setIsMenuOpen(false); }} className="text-3xl font-black text-left uppercase tracking-tight text-white hover:text-[#FFD700] transition-colors">Pricing</button>
+              <button onClick={() => { setActiveSection('contact'); setIsMenuOpen(false); }} className="text-3xl font-black text-left uppercase tracking-tight text-white hover:text-[#FFD700] transition-colors">Contact</button>
             </div>
 
             {/* Mobile Auth Drawer Buttons */}
-            <div className="border-t border-gray-100 pt-8 mt-auto space-y-4">
+            <div className="border-t border-yellow-500/20 pt-8 mt-auto space-y-4">
               {currentUser ? (
                 <>
                   {isAdmin && (
@@ -1302,6 +1367,7 @@ export default function App() {
         </div>
       </footer>
     </div>
+  </ToastContext.Provider>
   );
 }
 
@@ -1310,76 +1376,154 @@ function HomeView({ onExplore, isPiBrowser, piConfig }: { onExplore: (category?:
   return (
     <div className="w-full">
       {/* Hero Section */}
-      <section className="relative flex items-center justify-center py-24 px-6 overflow-hidden bg-gradient-to-b from-[#ffffff] to-[#f8f9fa] border-b border-gray-100">
-        <div className="absolute inset-0 z-0 opacity-5" style={{ backgroundImage: `url('${ASSETS.HERO_BG}')`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
+      <section className="relative flex items-center justify-center py-24 md:py-32 px-6 overflow-hidden bg-gradient-to-b from-[#000000] via-[#050811] to-[#000000] border-b border-yellow-500/15">
+        <div className="absolute inset-0 z-0 opacity-15" style={{ backgroundImage: `url('${ASSETS.HERO_BG}')`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
+        <div className="absolute inset-0 bg-radial from-yellow-500/5 via-transparent to-black pointer-events-none" />
         
         <div className="relative z-10 text-center max-w-5xl mx-auto px-4">
           <motion.div 
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
-            className="inline-block border border-yellow-500 px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-[0.25em] text-yellow-600 mb-8 bg-yellow-50"
+            className="inline-block border border-yellow-500/30 px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-[0.25em] text-[#FFD700] mb-6 bg-yellow-500/10 shadow-sm"
           >
-            Official Business Services Hub
+            GOYE SERVICES HUB
+          </motion.div>
+          <motion.div 
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.05 }}
+            className="text-xs md:text-sm font-black tracking-widest text-gray-300 uppercase mb-4"
+          >
+            CAC Services • Websites • AI Bots • Digital Business Solutions
           </motion.div>
           <motion.h1 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="text-4xl md:text-6xl font-black text-slate-900 uppercase leading-[1.1] tracking-tight pb-6 overflow-visible break-words"
+            className="text-4xl sm:text-5xl md:text-7xl font-black text-white uppercase leading-[1.08] tracking-tight pb-6 overflow-visible break-words"
           >
-            BUILD, REGISTER, <br className="hidden sm:inline" /> AUTOMATE & SCALE YOUR BUSINESS
+            Build Your Business. <br className="hidden sm:inline" />
+            Take It Online. <br className="hidden sm:inline" />
+            <span className="text-[#FFD700]">Add AI.</span>
           </motion.h1>
           <motion.p 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
-            className="text-slate-500 text-lg md:text-xl max-w-3xl mx-auto mb-12 font-medium leading-relaxed"
+            className="text-gray-300 text-sm md:text-base max-w-2xl mx-auto mb-10 font-medium leading-relaxed"
           >
-            CAC Services • Websites • AI Bots • Digital Solutions
+            Professional Nigeria-first business services platform built for Africa and global commerce. Streamlined registration support, high-performance websites, tailored AI bots, and digital growth infrastructure.
           </motion.p>
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3 }}
-            className="flex flex-row items-center justify-center gap-4 flex-wrap"
+            className="grid grid-cols-2 sm:grid-cols-4 gap-3 max-w-3xl mx-auto"
           >
-            <button onClick={() => onExplore('ALL')} className="bg-[#FFD700] hover:bg-yellow-400 text-black px-8 py-4 rounded-xl font-black text-xs uppercase tracking-widest transition-all shadow-md">
-              Get Started
+            <button 
+              onClick={() => onExplore('CAC')} 
+              className="bg-[#FFD700] hover:bg-yellow-400 text-black px-4 py-3.5 rounded-xl font-black text-[11px] uppercase tracking-wider transition-all shadow-lg hover:shadow-yellow-500/20 cursor-pointer"
+            >
+              Explore CAC Services
             </button>
-            <button onClick={() => onExplore('ALL')} className="border border-slate-900 text-slate-900 hover:bg-slate-50 px-8 py-4 rounded-xl font-black text-xs uppercase tracking-widest transition-all">
-              Explore Services
+            <button 
+              onClick={() => onExplore('WEB')} 
+              className="bg-[#0a0a0a] hover:bg-[#151515] text-[#FFD700] border border-yellow-500/30 px-4 py-3.5 rounded-xl font-black text-[11px] uppercase tracking-wider transition-all shadow cursor-pointer"
+            >
+              Build a Website
+            </button>
+            <button 
+              onClick={() => onExplore('AI')} 
+              className="bg-[#0a0a0a] hover:bg-[#151515] text-[#FFD700] border border-yellow-500/30 px-4 py-3.5 rounded-xl font-black text-[11px] uppercase tracking-wider transition-all shadow cursor-pointer"
+            >
+              Build an AI Bot
+            </button>
+            <button 
+              onClick={() => onExplore('DIG')} 
+              className="bg-[#0a0a0a] hover:bg-[#151515] text-[#FFD700] border border-yellow-500/30 px-4 py-3.5 rounded-xl font-black text-[11px] uppercase tracking-wider transition-all shadow cursor-pointer"
+            >
+              Explore Digital Solutions
             </button>
           </motion.div>
         </div>
       </section>
 
-      {/* Premium Stats Grid Bar */}
-      <section className="bg-white py-16 px-6 border-b border-gray-100">
-        <div className="max-w-7xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
+      {/* 4 Core Division Highlights Bar (Transparent, No Fake Numbers) */}
+      <section className="bg-[#050505] py-12 px-6 border-b border-yellow-500/10">
+        <div className="max-w-7xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
           {[
-            { v: "500+", l: "Elite Clients" },
-            { v: "98%", l: "Success Rate" },
-            { v: "24/7", l: "Dedicated Support" },
-            { v: "4", l: "Core Divisions" }
-          ].map((stat, idx) => (
-            <div key={idx} className="space-y-1">
-              <div className="text-3xl md:text-5xl font-black text-[#FFD700] tracking-tight">{stat.v}</div>
-              <p className="text-[10px] md:text-xs text-gray-500 font-bold uppercase tracking-widest">{stat.l}</p>
+            { t: "CAC REGISTRATION ASSISTANCE", d: "Business Name & LLC Support" },
+            { t: "WEBSITE DEVELOPMENT", d: "React Web Apps & E-commerce" },
+            { t: "AI CHATBOT DEVELOPMENT", d: "WhatsApp & Web Automations" },
+            { t: "DIGITAL BUSINESS SOLUTIONS", d: "Google Profile & Tools Setup" }
+          ].map((item, idx) => (
+            <div key={idx} className="p-4 rounded-2xl bg-[#0a0a0a] border border-yellow-500/15">
+              <div className="text-xs md:text-sm font-black text-[#FFD700] tracking-wider uppercase mb-1">{item.t}</div>
+              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">{item.d}</p>
             </div>
           ))}
         </div>
       </section>
 
-      {/* 4 Brand/Portfolio Cards Section with clean white background */}
-      <section className="bg-[#f8f9fa] py-24 px-6">
+      {/* Regulatory Transparency Disclaimer Banner */}
+      <div className="max-w-5xl mx-auto px-6 pt-10">
+        <div className="p-4 bg-yellow-500/5 border border-yellow-500/20 rounded-2xl text-center">
+          <p className="text-[11px] text-gray-300 font-bold uppercase tracking-wide leading-relaxed">
+            <span className="text-[#FFD700] font-black">Official Service Disclaimer:</span> GOYE provides registration assistance and business support. GOYE is not the Corporate Affairs Commission (CAC), is not a CAC employee, and does not claim accreditation or representation as a government agency. Final registration and approval timelines are determined exclusively by official CAC guidelines.
+          </p>
+        </div>
+      </div>
+
+      {/* Why Choose GOYE Section */}
+      <section className="py-20 px-6 max-w-7xl mx-auto">
+        <div className="text-center mb-14">
+          <h2 className="text-2xl md:text-4xl font-black uppercase tracking-tight text-white mb-3">Why Choose GOYE SERVICES HUB</h2>
+          <p className="text-gray-400 text-xs md:text-sm uppercase tracking-wider font-semibold max-w-xl mx-auto">
+            Engineered for African business builders with world-class technical standards and absolute integrity.
+          </p>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          {[
+            {
+              title: "Verified Real Integrations",
+              desc: "Non-custodial Paystack and native Pi Network payment pipelines with complete transparency and zero fabricated success simulation."
+            },
+            {
+              title: "Structured Workflow Tracking",
+              desc: "Step-by-step order lifecycle from intake to completion with audit references and private deliverables vault."
+            },
+            {
+              title: "High Performance Tech Stack",
+              desc: "Modern React SPAs, robust server-side processing, isolated custom conversational AI datasets, and enterprise configurations."
+            },
+            {
+              title: "Strict Data Privacy & Security",
+              desc: "Zero passphrases captured, isolated sandbox testnet routing, and customer data protected under rigorous standards."
+            }
+          ].map((feat, idx) => (
+            <div key={idx} className="p-6 rounded-2xl bg-[#0a0a0a] border border-yellow-500/15 flex flex-col justify-between">
+              <div>
+                <div className="w-8 h-8 rounded-lg bg-yellow-500/10 border border-yellow-500/30 flex items-center justify-center text-[#FFD700] font-mono text-xs font-black mb-4">
+                  0{idx + 1}
+                </div>
+                <h3 className="text-sm font-black uppercase tracking-wider text-white mb-2">{feat.title}</h3>
+                <p className="text-xs text-gray-400 font-medium leading-relaxed">{feat.desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* 4 Brand/Portfolio Cards Section */}
+      <section className="bg-[#050505] py-24 px-6 border-t border-yellow-500/10">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-5xl font-black uppercase tracking-tight mb-4 text-[#0a0a0a]">OUR SERVICES</h2>
-            <p className="text-gray-500 max-w-xl mx-auto font-medium text-sm">Professional services to help you build, launch, automate and grow your business.</p>
+            <h2 className="text-3xl md:text-5xl font-black uppercase tracking-tight mb-4 text-white">OUR FOUR MAIN DIVISIONS</h2>
+            <p className="text-gray-400 max-w-xl mx-auto font-medium text-sm">Professional services to help you build, launch, automate and grow your business.</p>
           </div>
 
           {/* Combined Services Overview Graphic Banner */}
-          <div className="mb-20 max-w-5xl mx-auto overflow-hidden rounded-[24px] border border-yellow-500/10 shadow-2xl bg-black">
+          <div className="mb-20 max-w-5xl mx-auto overflow-hidden rounded-[24px] border border-yellow-500/20 shadow-2xl bg-black">
             <img 
               src="/goye_combined_services.jpg" 
               alt="GOYE SERVICES HUB — CAC Services, Website Development, AI Bots and Digital Business Solutions" 
@@ -1392,10 +1536,10 @@ function HomeView({ onExplore, isPiBrowser, piConfig }: { onExplore: (category?:
             <ServiceHomeCard 
               image={ASSETS.CAC_IMG}
               badge="CAC DIVISION"
-              title="CAC Services"
-              desc="Business registration assistance, CAC filing preparation, annual returns support, Incorporated Trustee support, and related business-registration assistance."
+              title="CAC Registration Assistance"
+              desc="Business registration assistance, CAC filing preparation, annual returns support, Incorporated Trustee support, and related business documentation support."
               price="₦15,000"
-              btn="Explore CAC"
+              btn="Explore CAC Services"
               onClick={() => onExplore('CAC')}
             />
             <ServiceHomeCard 
@@ -1404,25 +1548,25 @@ function HomeView({ onExplore, isPiBrowser, piConfig }: { onExplore: (category?:
               title="Website Development"
               desc="Professional business websites, web applications, stores, portals, booking systems, dashboards, and custom digital platforms."
               price="₦45,000"
-              btn="Build Web"
+              btn="Build a Website"
               onClick={() => onExplore('WEB')}
             />
             <ServiceHomeCard 
               image={ASSETS.AI_IMG}
               badge="AI DIVISION"
-              title="AI Bots"
-              desc="AI chatbots, AI customer-support assistants, AI sales assistants, FAQ assistants, WhatsApp/website AI solutions, and business automation where actually implemented."
+              title="AI Chatbots & Assistants"
+              desc="Custom AI chatbots, support assistants, sales assistants, FAQ engines, and WhatsApp AI business automation flows."
               price="₦35,000"
-              btn="Build AI Bot"
+              btn="Build an AI Bot"
               onClick={() => onExplore('AI')}
             />
             <ServiceHomeCard 
               image={ASSETS.DIGITAL_IMG}
               badge="DIGITAL DIVISION"
               title="Digital Business Solutions"
-              desc="Business setup and digital support solutions, including business documents, digital business tools, workflow solutions, online presence support, and other legitimate digital business services offered by GOYE SERVICES HUB."
+              desc="Google Business Profile setup, corporate email configuration, payment gateway integrations, and digital business tools."
               price="₦10,000"
-              btn="Explore Solutions"
+              btn="Explore Digital Solutions"
               onClick={() => onExplore('DIG')}
             />
           </div>
@@ -1430,10 +1574,10 @@ function HomeView({ onExplore, isPiBrowser, piConfig }: { onExplore: (category?:
       </section>
 
       {/* Structured 5 Steps Process */}
-      <section className="bg-white py-24 px-6 border-t border-gray-100">
+      <section className="bg-[#000000] py-24 px-6 border-t border-yellow-500/10">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
-            <h2 className="text-3xl font-black uppercase tracking-widest mb-4 text-yellow-600">How It Works</h2>
+            <h2 className="text-3xl font-black uppercase tracking-widest mb-4 text-[#FFD700]">How It Works</h2>
             <p className="text-gray-400 font-bold uppercase text-[10px] tracking-widest">Our optimized service delivery cycle</p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-5 gap-8">
@@ -1444,7 +1588,7 @@ function HomeView({ onExplore, isPiBrowser, piConfig }: { onExplore: (category?:
               { n: '04', t: 'Secure Payment', d: 'Initiate payment securely through certified channels (Paystack, Pi).' },
               { n: '05', t: 'Track & Receive', d: 'Receive status updates and download finished digital products.' }
             ].map((step, idx) => (
-              <div key={idx} className="bg-[#f8f9fa] border border-gray-100 p-6 rounded-2xl flex flex-col items-center text-center">
+              <div key={idx} className="bg-[#0a0a0a] border border-yellow-500/15 p-6 rounded-2xl flex flex-col items-center text-center">
                 <div className="text-4xl font-black text-yellow-500 mb-4">{step.n}</div>
                 <h3 className="font-black uppercase text-xs mb-2">{step.t}</h3>
                 <p className="text-[10px] text-gray-500 font-bold uppercase leading-relaxed tracking-wider">{step.d}</p>
@@ -1701,7 +1845,7 @@ function PiTestnetPaymentTest({ isPiBrowser, piConfig }: { isPiBrowser: boolean,
 // --- Service Showcase Cards ---
 function ServiceHomeCard({ image, badge, title, desc, btn, price, onClick }: { image: string, badge: string, title: string, desc: string, btn: string, price: string, onClick: () => void }) {
   return (
-    <div className="bg-[#ffffff] text-[#0a0a0a] rounded-[24px] overflow-hidden shadow-lg hover:-translate-y-2 hover:shadow-2xl transition-all duration-300 flex flex-col justify-between border border-gray-100 group">
+    <div className="bg-[#0a0a0a] text-white rounded-[24px] overflow-hidden shadow-xl hover:-translate-y-2 hover:shadow-yellow-500/10 transition-all duration-300 flex flex-col justify-between border border-yellow-500/20 group">
       <div className="h-48 overflow-hidden relative">
         <img src={image} alt={title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
         <div className="absolute top-4 left-4 bg-[#FFD700] text-black font-black text-[9px] uppercase px-3 py-1.5 rounded-full tracking-wider shadow">
@@ -1710,15 +1854,15 @@ function ServiceHomeCard({ image, badge, title, desc, btn, price, onClick }: { i
       </div>
       <div className="p-8 flex-grow flex flex-col justify-between">
         <div>
-          <h3 className="text-[20px] font-black uppercase mb-3 tracking-tight group-hover:text-yellow-600 transition-colors leading-tight overflow-visible break-words">{title}</h3>
-          <p className="text-[14px] text-gray-500 font-medium uppercase tracking-wide leading-relaxed mb-6">{desc}</p>
+          <h3 className="text-[20px] font-black uppercase mb-3 tracking-tight group-hover:text-[#FFD700] transition-colors leading-tight overflow-visible break-words text-white">{title}</h3>
+          <p className="text-[13px] text-gray-400 font-medium uppercase tracking-wide leading-relaxed mb-6">{desc}</p>
         </div>
         <div>
-          <div className="border-t border-gray-100 pt-4 mb-6">
+          <div className="border-t border-yellow-500/15 pt-4 mb-6">
             <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Starting from</p>
             <p className="text-2xl font-black text-[#FFD700]">{price}</p>
           </div>
-          <button onClick={onClick} className="w-full bg-[#0a0a0a] text-white hover:bg-yellow-400 hover:text-black py-4 rounded-xl font-black uppercase tracking-widest text-xs transition-colors">
+          <button onClick={onClick} className="w-full bg-[#FFD700] text-black hover:bg-yellow-400 py-4 rounded-xl font-black uppercase tracking-widest text-xs transition-colors cursor-pointer shadow-md">
             {btn}
           </button>
         </div>
@@ -1733,28 +1877,28 @@ function ServicesView({ selectedService, onSelect, currentUser, onAuth, onSubmit
 
   if (selectedService) {
     return (
-      <div className="px-6 max-w-3xl mx-auto py-12 text-slate-900">
-        <button onClick={() => onSelect(null)} className="mb-8 text-yellow-600 flex items-center gap-2 font-black uppercase text-xs tracking-widest">
+      <div className="px-6 max-w-3xl mx-auto py-12 text-white">
+        <button onClick={() => onSelect(null)} className="mb-8 text-[#FFD700] hover:underline flex items-center gap-2 font-black uppercase text-xs tracking-widest cursor-pointer">
           <ChevronRight className="rotate-180" size={16} /> Back to Catalog
         </button>
-        <div className="bg-white border border-gray-100 rounded-3xl p-8 md:p-10 shadow-lg">
-          <div className="mb-8 pb-8 border-b border-gray-100 flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
+        <div className="bg-[#0a0a0a] border border-yellow-500/25 rounded-3xl p-8 md:p-10 shadow-2xl">
+          <div className="mb-8 pb-8 border-b border-yellow-500/15 flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
             <div>
-              <span className="bg-yellow-100 text-yellow-700 px-3 py-1 rounded text-[8px] font-black uppercase tracking-widest mb-3 inline-block">{selectedService.type} Division</span>
-              <h2 className="text-3xl font-black uppercase mb-1 tracking-tight text-slate-900">{selectedService.name}</h2>
-              <p className="text-gray-500 font-bold text-xs uppercase tracking-widest">Timeline: {selectedService.timeline}</p>
+              <span className="bg-yellow-500/10 text-[#FFD700] border border-yellow-500/20 px-3 py-1 rounded text-[8px] font-black uppercase tracking-widest mb-3 inline-block">{selectedService.type} Division</span>
+              <h2 className="text-3xl font-black uppercase mb-1 tracking-tight text-white">{selectedService.name}</h2>
+              <p className="text-gray-400 font-bold text-xs uppercase tracking-widest">Timeline: {selectedService.timeline}</p>
             </div>
             <div className="text-left md:text-right">
-              <p className="text-2xl font-black text-yellow-600">₦{selectedService.price.toLocaleString()}</p>
-              {selectedService.govtFee && <p className="text-[10px] text-gray-500 font-bold uppercase">+ ₦{selectedService.govtFee.toLocaleString()} Govt Fee</p>}
+              <p className="text-2xl font-black text-[#FFD700]">₦{(selectedService.price || 0).toLocaleString()}</p>
+              {selectedService.govtFee && <p className="text-[10px] text-gray-400 font-bold uppercase">+ ₦{(selectedService.govtFee || 0).toLocaleString()} Govt Fee</p>}
             </div>
           </div>
 
           {!currentUser ? (
-            <div className="text-center py-12 bg-slate-50 border border-dashed border-gray-200 rounded-2xl">
-              <Lock className="mx-auto mb-4 text-yellow-600" size={32} />
-              <p className="text-xs font-black text-gray-500 mb-6 uppercase tracking-widest">Sign In to initiate this service request</p>
-              <button onClick={onAuth} className="bg-yellow-500 text-black px-8 py-3 rounded-xl font-black uppercase tracking-widest text-xs">Access Account</button>
+            <div className="text-center py-12 bg-[#050505] border border-dashed border-yellow-500/20 rounded-2xl">
+              <Lock className="mx-auto mb-4 text-[#FFD700]" size={32} />
+              <p className="text-xs font-black text-gray-400 mb-6 uppercase tracking-widest">Sign In to initiate this service request</p>
+              <button onClick={onAuth} className="bg-[#FFD700] hover:bg-yellow-400 text-black px-8 py-3 rounded-xl font-black uppercase tracking-widest text-xs cursor-pointer shadow">Access Account</button>
             </div>
           ) : (
             <form className="space-y-6" onSubmit={(e) => { e.preventDefault(); onSubmit(selectedService, formData); }}>
@@ -1765,7 +1909,7 @@ function ServicesView({ selectedService, onSelect, currentUser, onAuth, onSubmit
               <FormInput label="Residential / Office Address" required onChange={v => setFormData({...formData, address: v})} />
 
               {selectedService.type === 'CAC' && (
-                <div className="space-y-6 pt-6 border-t border-gray-100">
+                <div className="space-y-6 pt-6 border-t border-yellow-500/15">
                   <FormInput label="Proposed Business Name" required onChange={v => setFormData({...formData, proposedName1: v})} />
                   <FormInput label="Alternative Business Name" onChange={v => setFormData({...formData, proposedName2: v})} />
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -1773,12 +1917,12 @@ function ServicesView({ selectedService, onSelect, currentUser, onAuth, onSubmit
                     <FormInput label="State" required onChange={v => setFormData({...formData, state: v})} />
                     <FormInput label="LGA" required onChange={v => setFormData({...formData, lga: v})} />
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase text-gray-500 tracking-widest">Nature of Business Activities</label>
-                    <textarea required onChange={e => setFormData({...formData, activities: e.target.value})} className="w-full bg-slate-50 border border-gray-200 rounded-xl p-4 h-32 outline-none focus:border-yellow-500 text-sm font-bold text-slate-900"></textarea>
+                  <div className="space-y-2 text-left">
+                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Nature of Business Activities</label>
+                    <textarea required onChange={e => setFormData({...formData, activities: e.target.value})} className="w-full bg-[#151515] border border-neutral-800 rounded-xl p-4 h-32 outline-none focus:border-[#FFD700] text-sm font-bold text-white"></textarea>
                   </div>
-                  <div className="p-4 bg-yellow-50 border border-yellow-100 rounded-xl flex gap-3 text-xs text-gray-600">
-                    <Info size={18} className="text-yellow-600 shrink-0" />
+                  <div className="p-4 bg-yellow-500/5 border border-yellow-500/20 rounded-xl flex gap-3 text-xs text-gray-300">
+                    <Info size={18} className="text-[#FFD700] shrink-0" />
                     <p className="font-bold uppercase tracking-wider text-[10px] leading-relaxed">
                       Wording: We assist customers with the CAC registration process. Final registration/approval is subject to Corporate Affairs Commission requirements.
                     </p>
@@ -1787,7 +1931,7 @@ function ServicesView({ selectedService, onSelect, currentUser, onAuth, onSubmit
               )}
 
               {selectedService.type === 'WEB' && (
-                <div className="space-y-6 pt-6 border-t border-gray-100">
+                <div className="space-y-6 pt-6 border-t border-yellow-500/15">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <FormInput label="Business / Brand Name" required onChange={v => setFormData({...formData, brandName: v})} />
                     <FormInput label="Business Category" required onChange={v => setFormData({...formData, bizCat: v})} />
@@ -1798,27 +1942,27 @@ function ServicesView({ selectedService, onSelect, currentUser, onAuth, onSubmit
               )}
 
               {selectedService.type === 'AI' && (
-                <div className="space-y-6 pt-6 border-t border-gray-100">
+                <div className="space-y-6 pt-6 border-t border-yellow-500/15">
                   <FormInput label="Business Name" required onChange={v => setFormData({...formData, businessName: v})} />
-                  <div className="p-4 bg-yellow-50 border border-yellow-100 rounded-xl text-xs text-gray-600 mb-4">
-                     <p className="text-yellow-600 font-black uppercase mb-1">AI Chatbot Setup Form</p>
+                  <div className="p-4 bg-yellow-500/5 border border-yellow-500/20 rounded-xl text-xs text-gray-300 mb-4">
+                     <p className="text-[#FFD700] font-black uppercase mb-1">AI Chatbot Setup Form</p>
                      <p className="font-bold uppercase tracking-wider text-[10px]">This is an intake questionnaire for custom deployment.</p>
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase text-gray-500 tracking-widest">List Common Customer FAQs</label>
-                    <textarea required onChange={e => setFormData({...formData, faqs: e.target.value})} className="w-full bg-slate-50 border border-gray-200 rounded-xl p-4 h-32 outline-none focus:border-yellow-500 text-sm font-bold text-slate-900"></textarea>
+                  <div className="space-y-2 text-left">
+                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest">List Common Customer FAQs</label>
+                    <textarea required onChange={e => setFormData({...formData, faqs: e.target.value})} className="w-full bg-[#151515] border border-neutral-800 rounded-xl p-4 h-32 outline-none focus:border-[#FFD700] text-sm font-bold text-white"></textarea>
                   </div>
                 </div>
               )}
 
               {selectedService.type === 'DIG' && (
-                <div className="space-y-6 pt-6 border-t border-gray-100">
+                <div className="space-y-6 pt-6 border-t border-yellow-500/15">
                   <FormInput label="Problem Description" required onChange={v => setFormData({...formData, problem: v})} />
                   <FormInput label="Desired Outcome" required onChange={v => setFormData({...formData, desiredOutcome: v})} />
                 </div>
               )}
 
-              <button type="submit" className="w-full bg-yellow-500 hover:bg-yellow-400 text-black py-4 rounded-xl font-black uppercase tracking-widest text-xs transition-colors shadow">
+              <button type="submit" className="w-full bg-[#FFD700] hover:bg-yellow-400 text-black py-4 rounded-xl font-black uppercase tracking-widest text-xs transition-colors shadow-lg cursor-pointer">
                 Submit & Process Service Request
               </button>
             </form>
@@ -1833,9 +1977,9 @@ function ServicesView({ selectedService, onSelect, currentUser, onAuth, onSubmit
     : SERVICES_CATALOG.filter(s => s.type === activeCategoryFilter);
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-12 text-slate-900">
+    <div className="max-w-7xl mx-auto px-6 py-12 text-white">
       <div className="mb-12">
-        <h2 className="text-3xl md:text-5xl font-black uppercase tracking-tighter mb-2">Service Catalog</h2>
+        <h2 className="text-3xl md:text-5xl font-black uppercase tracking-tighter mb-2 text-white">Service Catalog</h2>
         <p className="text-gray-400 text-sm uppercase tracking-widest font-bold">Nigeria's premier structured business support program</p>
       </div>
 
@@ -1851,10 +1995,10 @@ function ServicesView({ selectedService, onSelect, currentUser, onAuth, onSubmit
           <button
             key={cat.id}
             onClick={() => setActiveCategoryFilter(cat.id)}
-            className={`px-5 py-2.5 rounded-full font-black text-xs uppercase tracking-widest transition-all shrink-0 ${
+            className={`px-5 py-2.5 rounded-full font-black text-xs uppercase tracking-widest transition-all shrink-0 cursor-pointer ${
               activeCategoryFilter === cat.id
-                ? 'bg-[#FFD700] text-black shadow-sm'
-                : 'bg-white border border-gray-100 text-gray-500 hover:text-black'
+                ? 'bg-[#FFD700] text-black shadow-md'
+                : 'bg-[#0a0a0a] border border-yellow-500/20 text-gray-300 hover:text-white hover:border-yellow-500/40'
             }`}
           >
             {cat.label}
@@ -1864,28 +2008,28 @@ function ServicesView({ selectedService, onSelect, currentUser, onAuth, onSubmit
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
         {filteredServices.map(s => (
-          <div key={s.id} className="bg-white border border-gray-100 rounded-3xl overflow-hidden shadow hover:border-yellow-500/20 hover:shadow-lg transition-all flex flex-col animate-fadeIn">
+          <div key={s.id} className="bg-[#0a0a0a] border border-yellow-500/20 rounded-3xl overflow-hidden shadow-xl hover:border-yellow-500/40 hover:shadow-yellow-500/10 transition-all flex flex-col animate-fadeIn">
             <div className="h-44 relative">
               <img src={s.image} alt={s.name} className="w-full h-full object-cover" />
-              <div className="absolute inset-0 bg-black/10" />
+              <div className="absolute inset-0 bg-black/30" />
             </div>
             <div className="p-6 flex flex-col flex-1">
-              <span className="text-[8px] font-black uppercase bg-yellow-100 text-yellow-700 px-2.5 py-1 rounded-full tracking-widest self-start mb-4">{s.type} Division</span>
-              <h3 className="font-black uppercase text-lg leading-tight mb-3 text-slate-900">{s.name}</h3>
-              <p className="text-[11px] text-gray-500 font-bold uppercase leading-relaxed tracking-wider mb-8 flex-1">{s.description}</p>
-              <div className="flex justify-between items-center mb-6 pt-4 border-t border-gray-100">
+              <span className="text-[8px] font-black uppercase bg-yellow-500/10 border border-yellow-500/20 text-[#FFD700] px-2.5 py-1 rounded-full tracking-widest self-start mb-4">{s.type} Division</span>
+              <h3 className="font-black uppercase text-lg leading-tight mb-3 text-white">{s.name}</h3>
+              <p className="text-[11px] text-gray-400 font-bold uppercase leading-relaxed tracking-wider mb-8 flex-1">{s.description}</p>
+              <div className="flex justify-between items-center mb-6 pt-4 border-t border-yellow-500/15">
                 <div>
                   <p className="text-[8px] text-gray-400 font-bold uppercase tracking-widest">Professional Fee</p>
-                  <p className="text-lg font-black text-yellow-600">₦{s.price.toLocaleString()}</p>
+                  <p className="text-lg font-black text-[#FFD700]">₦{(s.price || 0).toLocaleString()}</p>
                 </div>
                 {s.govtFee && (
                   <div className="text-right">
                     <p className="text-[8px] text-gray-400 font-bold uppercase tracking-widest">Govt Fee</p>
-                    <p className="text-xs font-black text-gray-500">₦{s.govtFee.toLocaleString()}</p>
+                    <p className="text-xs font-black text-gray-400">₦{(s.govtFee || 0).toLocaleString()}</p>
                   </div>
                 )}
               </div>
-              <button onClick={() => onSelect(s)} className="w-full bg-slate-900 text-white hover:bg-yellow-400 hover:text-black py-3 rounded-xl font-black uppercase tracking-widest text-[10px] transition-all">
+              <button onClick={() => onSelect(s)} className="w-full bg-[#FFD700] text-black hover:bg-yellow-400 py-3 rounded-xl font-black uppercase tracking-widest text-[10px] transition-all cursor-pointer shadow">
                 Select Service
               </button>
             </div>
@@ -1949,11 +2093,11 @@ function DashboardView({ currentUser, onAuth, onLogout, setCurrentUser, requests
           };
           onPiRegister(profile);
         } else {
-          alert("Pi token server-side validation failed.");
+          safeNotify("Pi token server-side validation failed.", 'error');
         }
       }).catch((err: any) => {
         console.error("Pi Auth error: ", err);
-        alert("Pi SDK authentication failed.");
+        safeNotify("Pi SDK authentication failed.", 'error');
       });
     }
   };
@@ -2011,7 +2155,7 @@ function DashboardView({ currentUser, onAuth, onLogout, setCurrentUser, requests
     setSupportTickets(updated);
     safeStorage.set('local', 'goye_tickets_v2', JSON.stringify(updated));
     setTicketMsg('');
-    alert("Support request submitted successfully.");
+    safeNotify("Support request submitted successfully.", 'success');
   };
 
   const [activeTab, setActiveTab] = useState<'requests' | 'quotes' | 'documents' | 'support' | 'profile'>('requests');
@@ -2081,7 +2225,7 @@ function DashboardView({ currentUser, onAuth, onLogout, setCurrentUser, requests
                       <div className="flex gap-4 items-center text-[10px] text-gray-400 font-bold uppercase tracking-wider">
                          <span>Date: {new Date(req.createdAt).toLocaleDateString()}</span>
                          <span>•</span>
-                         <span>Fee: ₦{(req.amount).toLocaleString()}</span>
+                         <span>Fee: ₦{(req.amount || 0).toLocaleString()}</span>
                       </div>
                     </div>
                     <div className="flex items-center gap-4 w-full md:w-auto justify-between border-t border-gray-50 md:border-0 pt-4 md:pt-0">
@@ -2126,7 +2270,7 @@ function DashboardView({ currentUser, onAuth, onLogout, setCurrentUser, requests
                       <p className="text-[9px] text-gray-400 font-black uppercase">Expires: {new Date(q.expiresAt).toLocaleDateString()}</p>
                     </div>
                     <div className="flex items-center gap-6 w-full md:w-auto justify-between border-t border-yellow-200/30 md:border-0 pt-4 md:pt-0">
-                      <p className="text-xl font-black text-slate-900">₦{q.total.toLocaleString()}</p>
+                      <p className="text-xl font-black text-slate-900">₦{(q.total || 0).toLocaleString()}</p>
                       <button onClick={() => onPay(q)} className="bg-yellow-500 hover:bg-yellow-400 text-black px-6 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest shadow shrink-0">Pay Invoice</button>
                     </div>
                   </div>
@@ -2156,7 +2300,7 @@ function DashboardView({ currentUser, onAuth, onLogout, setCurrentUser, requests
                       </div>
                       <a 
                         href="#" 
-                        onClick={(e) => { e.preventDefault(); alert("File downloaded securely through verified credentials."); }}
+                        onClick={(e) => { e.preventDefault(); safeNotify("File downloaded securely through verified credentials.", 'success'); }}
                         className="p-3 bg-yellow-500 text-black rounded-xl hover:bg-yellow-400 transition-colors shrink-0 shadow-sm"
                       >
                         <Download size={14} />
@@ -2220,12 +2364,12 @@ function DashboardView({ currentUser, onAuth, onLogout, setCurrentUser, requests
                     const data = await res.json();
                     setCurrentUser(data.profile);
                     safeStorage.set('local', 'goye_user_profile', JSON.stringify(data.profile));
-                    alert("Profile updated successfully on the secure server!");
+                    safeNotify("Profile updated successfully on the secure server!", 'success');
                   } else {
-                    alert("Failed to save profile changes to server.");
+                    safeNotify("Failed to save profile changes to server.", 'error');
                   }
                 } catch (err: any) {
-                  alert(`Network error saving profile: ${err.message}`);
+                  safeNotify(`Network error saving profile: ${err.message}`, 'error');
                 }
               }} className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs font-bold uppercase tracking-wider text-gray-500">
@@ -2392,10 +2536,10 @@ function AdminView({ currentUser, requests, setRequests, quotes, setQuotes, audi
         safeStorage.set('local', 'goye_requests_v2', JSON.stringify(updated));
       } else {
         const errData = await res.json();
-        alert(`Failed to update status on server: ${errData.error}`);
+        safeNotify(`Failed to update status on server: ${errData.error}`, 'error');
       }
     } catch (e: any) {
-      alert(`Network error updating status: ${e.message}`);
+      safeNotify(`Network error updating status: ${e.message}`, 'error');
     }
   };
 
@@ -2433,13 +2577,13 @@ function AdminView({ currentUser, requests, setRequests, quotes, setQuotes, audi
         setSelectedReq(null);
         setQuoteAmount(0);
         setQuoteNotes('');
-        alert("Quote successfully sent to customer.");
+        safeNotify("Quote successfully sent to customer.", 'success');
       } else {
         const errData = await res.json();
-        alert(`Failed to create quote on server: ${errData.error}`);
+        safeNotify(`Failed to create quote on server: ${errData.error}`, 'error');
       }
     } catch (e: any) {
-      alert(`Network error sending quote: ${e.message}`);
+      safeNotify(`Network error sending quote: ${e.message}`, 'error');
     }
   };
 
@@ -2473,7 +2617,7 @@ function AdminView({ currentUser, requests, setRequests, quotes, setQuotes, audi
           <StatMini label="Total Orders" value={requests.length} />
           <StatMini label="Paid Orders" value={requests.filter(r => r.status === 'PAYMENT VERIFIED' || r.status === 'COMPLETED').length} />
           <StatMini label="Pending Orders" value={requests.filter(r => r.status !== 'PAYMENT VERIFIED' && r.status !== 'COMPLETED').length} />
-          <StatMini label="Total Revenue" value={`₦${requests.filter(r => r.status === 'PAYMENT VERIFIED' || r.status === 'COMPLETED').reduce((acc, r) => acc + r.amount, 0).toLocaleString()}`} />
+          <StatMini label="Total Revenue" value={`₦${requests.filter(r => r.status === 'PAYMENT VERIFIED' || r.status === 'COMPLETED').reduce((acc, r) => acc + (r.amount || 0), 0).toLocaleString()}`} />
         </div>
       </div>
 
@@ -2517,7 +2661,7 @@ function AdminView({ currentUser, requests, setRequests, quotes, setQuotes, audi
                   <tr key={req.id} className="border-t border-gray-100">
                     <td className="p-4 font-mono text-yellow-600">{req.requestNumber}</td>
                     <td className="p-4 text-slate-900">{req.serviceName}</td>
-                    <td className="p-4 text-slate-900">₦{req.amount.toLocaleString()}</td>
+                    <td className="p-4 text-slate-900">₦{(req.amount || 0).toLocaleString()}</td>
                     <td className="p-4">
                       <select 
                         value={req.status} 
@@ -2614,7 +2758,7 @@ function AdminView({ currentUser, requests, setRequests, quotes, setQuotes, audi
                       TESTNET (ACTIVE)
                     </button>
                     <button 
-                      onClick={() => alert("Security Lock: Mainnet Mode is programmatically BLOCKED to comply with current Pi sandbox policies.")}
+                      onClick={() => safeNotify("Security Lock: Mainnet Mode is programmatically BLOCKED to comply with current Pi sandbox policies.", 'info')}
                       className="py-2 rounded-lg font-black text-[9px] tracking-widest transition-all bg-slate-100 text-red-500 opacity-60 cursor-not-allowed"
                       title="Mainnet Blocked"
                     >
@@ -2974,7 +3118,7 @@ function LegacyCheckoutModal_Disabled({ item, isPiBrowser, onClose, onComplete, 
         if (res.ok) {
           setIsVerifying(false);
           onComplete(txHash.trim(), method === 'usdt' ? 'USDT_BEP20' : 'USDC_BASE');
-          alert("Cryptocurrency transaction hash submitted to administrators. Payment will remain PENDING until verified manually.");
+          safeNotify("Cryptocurrency transaction hash submitted to administrators. Payment will remain PENDING until verified manually.", 'info');
         } else {
           const errData = await res.json();
           setPaymentError(errData.error || "Failed to log crypto payment reference on server.");
@@ -3128,7 +3272,7 @@ function LegacyCheckoutModal_Disabled({ item, isPiBrowser, onClose, onComplete, 
         <div className="p-4 bg-slate-50 rounded-2xl mb-6 border border-gray-100 flex justify-between items-center font-sans">
            <div>
               <p className="text-[8px] text-gray-400 uppercase font-black tracking-widest mb-1">Local Fee</p>
-              <p className="text-xl font-black text-slate-900">₦{price.toLocaleString()}</p>
+              <p className="text-xl font-black text-slate-900">₦{(price || 0).toLocaleString()}</p>
            </div>
            {method === 'pi' && (
              <div className="text-right">
@@ -3315,7 +3459,7 @@ function ContactView({ config }: { config: any }) {
             </div>
          </div>
 
-         <form className="space-y-4" onSubmit={e => { e.preventDefault(); alert('Message sent successfully. Our support desk will reach out.'); }}>
+         <form className="space-y-4" onSubmit={e => { e.preventDefault(); safeNotify('Message sent successfully. Our support desk will reach out.', 'success'); }}>
             <FormInput label="Name" required onChange={() => {}} />
             <FormInput label="Email" type="email" required onChange={() => {}} />
             <div className="space-y-2 text-left">
