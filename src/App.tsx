@@ -2060,45 +2060,70 @@ function DashboardView({ currentUser, onAuth, onLogout, setCurrentUser, requests
     }
   }, [currentUser]);
 
-  const handlePiAuthentication = () => {
-    if (typeof window !== 'undefined' && (window as any).Pi && onPiRegister) {
-      (window as any).Pi.authenticate(['username', 'payments'], async (payment: any) => {
-        console.log("Incomplete payment found on auth: ", payment);
-        try {
-          await fetch('/api/pi/complete', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ paymentId: payment.identifier, txid: payment.transaction.txid })
-          });
-        } catch (err) {
-          console.error("Failed to reconcile incomplete payment on auth:", err);
-        }
-      }).then(async (auth: any) => {
-        const verifyRes = await fetch('/api/pi/verify-user', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ accessToken: auth.accessToken })
-        });
-        const verifyData = await verifyRes.json();
-        if (verifyData && verifyData.status === 'success') {
-          const piUser = verifyData.data;
-          const profile = {
-            id: piUser.uid || auth.user.uid,
-            name: piUser.username || auth.user.username,
-            email: `${piUser.username || auth.user.username}@goye-pi.store`,
-            phone: "Pi Network Verified User",
-            role: (piUser.username === 'goyedagosmessenterprise' || piUser.username === 'ifiok82') ? 'admin' : 'customer',
-            createdAt: Date.now(),
-            accessToken: auth.accessToken
-          };
-          onPiRegister(profile);
-        } else {
-          safeNotify("Pi token server-side validation failed.", 'error');
-        }
-      }).catch((err: any) => {
-        console.error("Pi Auth error: ", err);
-        safeNotify("Pi SDK authentication failed.", 'error');
+  const [piAuthStatus, setPiAuthStatus] = useState<'idle' | 'connecting' | 'authenticated' | 'error'>('idle');
+  const [piAuthError, setPiAuthError] = useState<string | null>(null);
+  const [piSessionToken, setPiSessionToken] = useState<string | null>(null);
+  const [piAuthUsername, setPiAuthUsername] = useState<string | null>(null);
+
+  const handlePiAuthentication = async () => {
+    if (typeof window === 'undefined' || !(window as any).Pi) {
+      setPiAuthStatus('error');
+      setPiAuthError("Pi authentication is currently unavailable. Please try again later.");
+      return;
+    }
+
+    setPiAuthStatus('connecting');
+    setPiAuthError(null);
+
+    try {
+      const Pi = (window as any).Pi;
+      await Pi.init({ version: "2.0" });
+
+      const onIncompletePaymentFound = (payment: any) => {
+        console.log("Incomplete payment found:", payment);
+      };
+
+      const authResult = await Pi.authenticate(["username"], onIncompletePaymentFound);
+      if (!authResult || !authResult.accessToken) {
+        throw new Error("Pi authentication failed to return an access token.");
+      }
+
+      const response = await fetch("https://backend.appstudio-u7cm9zhmha0ruwv8.piappengine.com/pi/auth/v1/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accessToken: authResult.accessToken })
       });
+
+      if (!response.ok) {
+        throw new Error("App Studio token exchange failed.");
+      }
+
+      const data = await response.json();
+      if (!data.sessionToken || !data.user || !data.user.username) {
+        throw new Error("Invalid response from App Studio authentication.");
+      }
+
+      // Store sessionToken in application memory / React state only
+      setPiSessionToken(data.sessionToken);
+      setPiAuthUsername(data.user.username);
+      setPiAuthStatus('authenticated');
+
+      // Use ONLY returned App Studio user object as authoritative identity
+      const profile = {
+        id: data.user.uid,
+        name: data.user.username,
+        email: `${data.user.username}@goye-pi.store`,
+        phone: "Pi Network Verified User",
+        role: (data.user.username === 'goyedagosmessenterprise' || data.user.username === 'ifiok82') ? 'admin' : 'customer',
+        createdAt: Date.now()
+      };
+      if (onPiRegister) {
+        onPiRegister(profile);
+      }
+    } catch (err: any) {
+      console.error("Pi authentication error:", err);
+      setPiAuthStatus('error');
+      setPiAuthError(err.message || "Pi authentication is currently unavailable. Please try again later.");
     }
   };
 
@@ -2110,13 +2135,28 @@ function DashboardView({ currentUser, onAuth, onLogout, setCurrentUser, requests
           <h2 className="text-3xl font-black uppercase mb-1 tracking-tighter text-slate-900">Access HUB</h2>
           <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mb-8">Access customer portal & verify payments</p>
           
-          {isPiBrowser && (
-            <button 
-              onClick={handlePiAuthentication}
-              className="w-full bg-slate-900 hover:bg-slate-800 text-white hover:text-yellow-400 py-4 rounded-xl font-black uppercase tracking-widest flex items-center justify-center gap-2 mb-6 border border-gray-150 transition-all text-xs"
-            >
-              <Bot size={16} className="text-yellow-400 animate-pulse" /> Sign In with Pi Network
-            </button>
+          {isPiBrowser && piAuthStatus !== 'authenticated' && (
+            <div className="space-y-4 mb-6">
+              <button 
+                onClick={handlePiAuthentication}
+                disabled={piAuthStatus === 'connecting'}
+                className="w-full bg-slate-900 hover:bg-slate-800 text-white hover:text-yellow-400 py-4 rounded-xl font-black uppercase tracking-widest flex items-center justify-center gap-2 border border-gray-150 transition-all text-xs disabled:opacity-50"
+              >
+                <Bot size={16} className="text-yellow-400 animate-pulse" />
+                {piAuthStatus === 'connecting' ? 'Connecting to Pi...' : 'Sign in with Pi'}
+              </button>
+              {piAuthStatus === 'error' && (
+                <p className="text-red-500 text-[11px] font-bold">
+                  {piAuthError || "Pi authentication is currently unavailable. Please try again later."}
+                </p>
+              )}
+            </div>
+          )}
+
+          {piAuthStatus === 'authenticated' && piAuthUsername && (
+            <div className="mb-6 p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 font-bold text-xs">
+              Signed in as @{piAuthUsername}
+            </div>
           )}
 
           {isPiBrowser && (

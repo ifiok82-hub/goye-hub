@@ -215,24 +215,6 @@ async function createServer() {
     }
   });
 
-  // Server-Side Pi User Access Token Verification
-  app.post('/api/pi/verify-user', async (req, res) => {
-    const { accessToken } = req.body;
-    try {
-      if (!accessToken) {
-        return res.status(400).json({ status: false, message: 'Missing access token' });
-      }
-      const response = await axios.get('https://api.minepi.com/v2/me', {
-        headers: {
-          Authorization: `Bearer ${accessToken}`
-        }
-      });
-      res.json({ status: 'success', data: response.data });
-    } catch (error: any) {
-      console.error("Pi Verify User Error: ", error.response?.data || error.message);
-      res.status(500).json({ status: 'error', message: error.response?.data || error.message });
-    }
-  });
 
   // Unique Server-Side Order Reference Generator
   app.post('/api/orders/generate-reference', (req, res) => {
